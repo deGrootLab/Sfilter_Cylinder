@@ -1,0 +1,147 @@
+ Selectivity filter detection:
+         703           4           1          63 THR      O
+         719           3           1          64 VAL      O
+         726           2           1          65 GLY      O
+         747           1           1          66 TYR      O
+        2193           4           2          63 THR      O
+        2209           3           2          64 VAL      O
+        2216           2           2          65 GLY      O
+        2237           1           2          66 TYR      O
+        3683           4           3          63 THR      O
+        3699           3           3          64 VAL      O
+        3706           2           3          65 GLY      O
+        3727           1           3          66 TYR      O
+        5173           4           4          63 THR      O
+        5189           3           4          64 VAL      O
+        5196           2           4          65 GLY      O
+        5217           1           4          66 TYR      O
+         696           5           1          63 THR    OG1
+        2186           5           2          63 THR    OG1
+        3676           5           3          63 THR    OG1
+        5166           5           4          63 THR    OG1
+ Nr. of K ions in input:         160
+ Nr. of waters in input:           0
+  0.0000000E+00           4           0           3 0KKKK0 F F F F
+   100.0000               3           0           3 KK0KK0 F F F F
+   200.0000               3           0           3 KK0KK0 F F F F
+   300.0000               4           0           3 0KKKK0 F F F F
+   400.0000               4           0           3 0KKKK0 F F F F
+   500.0000               4           0           3 0KKKK0 F F F F
+   600.0000               3           0           2 KK0KK0 F F F F
+   700.0000               3           0           2 0KK0K0 F F F F
+   800.0000               3           0           1 0K0KK0 F F F F
+   900.0000               3           0           2 0K0KK0 F F F F
+   1000.000               3           0           2 K0KKK0 F F F F
+   1100.000               3           0           2 K0KKK0 F F F F
+   1200.000               3           0           2 KKK0K0 F F F F
+   1300.000               3           0           2 K0KKK0 F F F F
+   1400.000               3           0           3 KK0KK0 F F F F
+   1500.000               4           0           3 0KKKK0 F F F F
+   1600.000               4           0           3 0KKKK0 F F F F
+   1700.000               4           0           3 0KKKK0 F F F F
+   1800.000               4           0           3 0KKKK0 F F F F
+   1900.000               4           0           3 0KKKK0 F F F F
+   2000.000               4           0           3 0KKKK0 F F F F
+   2100.000               3           0           3 K0KKK0 F F F F
+   2200.000               4           0           3 0KKKK0 F F F F
+   2300.000               4           0           3 0KKKK0 F F F F
+   2400.000               4           0           3 0KKKK0 F F F F
+   2500.000               3           0           3 K0KKK0 F F F F
+   2600.000               3           0           3 K0KKK0 F F F F
+   2700.000               4           0           3 0KKKK0 F F F F
+   2800.000               3           0           3 KK0KK0 F F F F
+   2900.000               4           0           3 0KKKK0 F F F F
+   3000.000               4           0           3 0KKKK0 F F F F
+   3100.000               4           0           3 0KKKK0 F F F F
+   3200.000               4           0           3 0KKKK0 F F F F
+   3300.000               4           0           3 0KKKK0 F F F F
+   3400.000               3           0           3 K0KKK0 F F F F
+   3500.000               4           0           3 0KKKK0 F F F F
+   3600.000               3           0           3 K0KKK0 F F F F
+   3700.000               4           0           3 0KKKK0 F F F F
+   3800.000               4           0           3 0KKKK0 F F F F
+   3900.000               3           0           2 0K0KK0 F F F F
+   4000.000               3           0           2 0K0KK0 F F F F
+   4100.000               3           0           2 0K0KK0 F F F F
+   4200.000               3           0           2 0K0KK0 F F F F
+   4300.000               3           0           1 0KK0K0 F F F F
+   4400.000               3           0           2 0KK0K0 F F F F
+   4500.000               3           0           1 0KK0K0 F F F F
+   4600.000               3           0           1 0KK0K0 F F F F
+   4700.000               3           0           2 0KK0K0 F F F F
+   4800.000               3           0           2 0KK0K0 F F F F
+   4900.000               3           0           1 0KK0K0 F F F F
+   5000.000               3           0           2 0KK0K0 F F F F
+   5100.000               3           0           2 0K0KK0 F F F F
+   5200.000               3           0           2 0KK0K0 F F F F
+   5300.000               3           0           2 0KK0K0 F F F F
+   5400.000               3           0           2 0KK0K0 F F F F
+   5500.000               3           0           1 0KK0K0 F F F F
+   5600.000               3           0           2 0K0KK0 F F F F
+   5700.000               3           0           2 0KK0K0 F F T F
+   5800.000               3           0           1 0K0KK0 F F F F
+   5900.000               3           0           2 0KK0K0 F F F F
+   6000.000               3           0           2 0K0KK0 F F F F
+   6100.000               3           0           2 0K0KK0 F F F F
+   6200.000               3           0           2 0K0KK0 F F F F
+   6300.000               3           0           2 0K0KK0 F F F F
+   6400.000               3           0           2 0K0KK0 F F F F
+   6500.000               3           0           2 0K0KK0 F F F F
+   6600.000               3           0           2 0KK0KK F F F F
+   6700.000               3           0           2 0KK0KK F F F F
+   6800.000               4           0           3 0KKKK0 F F F F
+   6900.000               4           0           3 0KKKK0 F F F F
+   7000.000               4           0           3 0KKKK0 F F F F
+   7100.000               4           0           3 0KKKK0 F F F F
+   7200.000               4           0           3 0KKKK0 F F F F
+   7300.000               3           0           3 K0KKK0 F F F F
+   7400.000               4           0           3 0KKKK0 F F F F
+   7500.000               4           0           3 0KKKK0 F F F F
+   7600.000               3           0           3 KK0KK0 F F F F
+   7700.000               4           0           3 0KKKK0 F F F F
+   7800.000               3           0           3 K0KKK0 F F F F
+   7900.000               4           0           3 0KKKK0 F F F F
+   8000.000               4           0           3 0KKKK0 F F F F
+   8100.000               4           0           3 0KKKK0 F F F F
+   8200.000               4           0           3 0KKKK0 F F F F
+   8300.000               3           0           3 K0KKK0 F F F F
+   8400.000               4           0           3 0KKKK0 F F F F
+   8500.000               3           0           3 K0KKK0 F F F F
+   8600.000               4           0           3 0KKKK0 F F F F
+   8700.000               4           0           3 0KKKK0 F F F F
+   8800.000               3           0           3 K0KKK0 F F F F
+   8900.000               4           0           3 0KKKK0 F F F F
+   9000.000               4           0           3 0KKKK0 F F F F
+   9100.000               4           0           3 0KKKK0 F F F F
+   9200.000               4           0           3 0KKKK0 F F F F
+   9300.000               4           0           3 0KKKK0 F F F F
+   9400.000               3           0           3 K0KKK0 F F F F
+   9500.000               4           0           3 0KKKK0 F F F F
+   9600.000               4           0           3 0KKKK0 F F F F
+   9700.000               4           0           3 0KKKK0 F F F F
+   9800.000               4           0           3 0KKKK0 F F F F
+   9900.000               4           0           3 0KKKK0 F F F F
+   10000.00               4           0           3 0KKKK0 F F F F
+   10100.00               4           0           3 0KKKK0 F F F F
+   10200.00               3           0           3 KK0KK0 F F F F
+   10300.00               3           0           2 KKK0K0 F F F F
+   10400.00               3           0           3 K0KKK0 F F F F
+   10500.00               3           0           3 K0KKK0 F F F F
+   10600.00               3           0           3 K0KKK0 F F F F
+   10700.00               4           0           3 0KKKK0 F F F F
+   10800.00               4           0           3 0KKKK0 F F F F
+   10900.00               4           0           3 0KKKK0 F F F F
+   11000.00               4           0           3 0KKKK0 F F F F
+   11100.00               3           0           4 KK0KKK F F F F
+   11200.00               4           0           3 0KKKK0 F F F F
+   11300.00               3           0           3 K0KKK0 F F F F
+   11400.00               3           0           2 0KK0K0 F F F F
+   11500.00               3           0           2 0K0KK0 F F F F
+   11600.00               3           0           1 0KK0K0 F F F F
+   11700.00               3           0           2 0KKK0K F F F F
+   11800.00               3           0           3 K0KKK0 F F F F
+   11900.00               4           0           3 0KKKK0 F F F F
+   12000.00               4           0           3 0KKKK0 F F F F
+ Nr. of K+ permeation up        :           2
+ Nr. of K+ permeation down      :           0
+ Nr. of water permeation events :           0           0           0
