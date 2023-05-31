@@ -142,8 +142,12 @@ class PermeationEvent:
             min_time = time_step * min(x[2] for x in self.down_3_count)
             lines.append(f"Minimum down crossing resident time    : {min_time}\n")
         for name, i in (("1_2, SF inside out    ", self.safe_1_2_count),
-                        ("2_1, SF outside in    ", self.safe_2_1_count),
-                        ("3_2, upper to membrane", self.safe_3_2_count),
+                        ("2_1, SF outside in    ", self.safe_2_1_count)):
+            lines.append(f"Number of {name} event : {len(i)}\n")
+            for index, frame, res_time in i:
+                lines.append(f"{index} , frame {frame}, resident time : {res_time[0]},  {res_time[1]}\n")
+
+        for name, i in (("3_2, upper to membrane", self.safe_3_2_count),
                         ("2_3, membrane to upper", self.safe_2_3_count),
                         ("4_2, lower to membrane", self.safe_4_2_count),
                         ("2_4, membrane to lower", self.safe_2_4_count)):
