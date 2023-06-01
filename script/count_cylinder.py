@@ -5,6 +5,8 @@ import argparse
 from Sfilter import Sfilter
 import numpy as np
 import MDAnalysis as mda
+import sys
+import datetime
 
 
 class PermeationEvent:
@@ -238,7 +240,11 @@ if __name__ == "__main__":
                         default="perm_event.out",
                         help="post fix for output, default perm_event.out",)
     args = parser.parse_args()
+    now = datetime.datetime.now()
     print("#################################################################################")
+    print("Time :", now.strftime("%Y-%m-%d %H:%M:%S"))
+    print("The command you used is :")
+    print(" ".join(sys.argv))
     print("PDB top file :", args.top.name)
     print("xtc traj file:", args.traj.name)
     print("Ion name(s) in this pdb should be:", args.K_name)
