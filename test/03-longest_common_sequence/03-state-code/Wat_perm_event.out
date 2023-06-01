@@ -1,0 +1,92 @@
+# Permeation up 4 -> 1 -> 3 #######
+# index (0 base),  frame,  time(ps), resident_time_in_the_cylinder
+None
+# Permeation up 3 -> 1 -> 4 #######
+# index (0 base),  frame,  time(ps), resident_time_in_the_cylinder
+None
+
+#################################
+Assumed voltage (mV)   : 300.0
+Simulation time (ns)   : 500.0
+Permeation events up   : 0
+Permeation events down : 0
+Ave current (pA)       : 0.00000
+Ave conductance (pS)   : 0.00000
+###############################
+
+Safety check
+Net permeation events up crossing 4    : -5
+Minimum up   crossing resident time    : 140.0
+Minimum down crossing resident time    : 200.0
+Net permeation events up crossing 3    : 0
+Number of 1_2, SF inside out     event : 29
+42878 , frame 7522, resident time : 1,  1
+61811 , frame 8720, resident time : 1,  1
+54581 , frame 8869, resident time : 4,  1
+62075 , frame 9083, resident time : 2,  1
+41606 , frame 9098, resident time : 6,  1
+42635 , frame 9134, resident time : 1,  1
+51329 , frame 9156, resident time : 1,  1
+49382 , frame 9232, resident time : 1,  1
+46541 , frame 9321, resident time : 2,  1
+58544 , frame 9433, resident time : 1,  1
+56918 , frame 9690, resident time : 2,  1
+56078 , frame 9724, resident time : 5,  1
+38414 , frame 9735, resident time : 1,  1
+47738 , frame 11194, resident time : 2,  1
+30638 , frame 13811, resident time : 1,  1
+57587 , frame 14551, resident time : 1,  1
+51638 , frame 14911, resident time : 2,  1
+41636 , frame 18508, resident time : 1,  1
+31466 , frame 22481, resident time : 2,  1
+59900 , frame 22816, resident time : 1,  1
+57929 , frame 22868, resident time : 2,  1
+36632 , frame 22940, resident time : 1,  1
+44951 , frame 23106, resident time : 1,  1
+60344 , frame 23147, resident time : 2,  1
+31943 , frame 23295, resident time : 3,  1
+39668 , frame 24436, resident time : 1,  1
+38384 , frame 24452, resident time : 3,  1
+51593 , frame 24487, resident time : 1,  1
+48500 , frame 24826, resident time : 2,  1
+Number of 2_1, SF outside in     event : 35
+42377 , frame 5376, resident time : 1,  1
+48218 , frame 6462, resident time : 1,  1
+61811 , frame 8721, resident time : 1,  1
+41606 , frame 9086, resident time : 2,  1
+42635 , frame 9133, resident time : 1,  1
+42635 , frame 9135, resident time : 1,  1
+51329 , frame 9155, resident time : 2,  1
+57134 , frame 9391, resident time : 3,  1
+54551 , frame 9626, resident time : 1,  1
+36281 , frame 9637, resident time : 1,  1
+40193 , frame 11078, resident time : 1,  1
+54467 , frame 11101, resident time : 1,  1
+59273 , frame 12111, resident time : 1,  1
+49646 , frame 12505, resident time : 1,  1
+41684 , frame 14835, resident time : 1,  1
+44243 , frame 17395, resident time : 1,  1
+34568 , frame 17490, resident time : 1,  1
+31427 , frame 20538, resident time : 1,  1
+29699 , frame 21399, resident time : 1,  1
+39584 , frame 21535, resident time : 2,  1
+41207 , frame 21977, resident time : 1,  1
+31466 , frame 22482, resident time : 1,  1
+38177 , frame 22565, resident time : 1,  1
+52520 , frame 22787, resident time : 1,  1
+59900 , frame 22815, resident time : 1,  1
+59900 , frame 22817, resident time : 1,  1
+50417 , frame 22851, resident time : 1,  1
+36632 , frame 22941, resident time : 1,  1
+39215 , frame 23022, resident time : 1,  1
+43661 , frame 23103, resident time : 1,  1
+60344 , frame 23148, resident time : 1,  1
+53903 , frame 24416, resident time : 1,  1
+51593 , frame 24488, resident time : 1,  1
+48500 , frame 24827, resident time : 1,  1
+56534 , frame 24884, resident time : 1,  1
+Number of 3_2, upper to membrane event : 77295
+Number of 2_3, membrane to upper event : 77298
+Number of 4_2, lower to membrane event : 470
+Number of 2_4, membrane to lower event : 456
+Done
