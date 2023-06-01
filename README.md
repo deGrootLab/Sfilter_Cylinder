@@ -18,6 +18,13 @@ count_cylinder.py -pdb em_dry.gro \
   -xtc fix_atom_c_100ps_dry.xtc -K K \
   -SF_seq THR VAL GLY TYR GLY > k_cylinder.out
   # There are two permeation events in this example
+  
+cd ../../../03-longest_common_sequence/
+match_xtck.py \
+  -cylinderS 03-state-code/POT_perm_event.out \
+  -perm_up 01-xtck/perm_up.dat \
+  -perm_down 01-xtck/perm_down.dat
+  # match result with xtck
 ```
 The potassium permeation will be saved in `POT_perm_event.out`. Please take a look at the resident time. 
 this is the time that the atom stays in the cylinder. This time should be safely smaller than the trajectory 
