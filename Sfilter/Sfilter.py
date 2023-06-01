@@ -149,11 +149,12 @@ class Sfilter:
                 C : There is 1 K+ in this binding site, and there is at least 1 water.
                 0 : There is neither K+ nor water in this binging site. (number 0, not letter O)
             "Everything"
-                binding sites are seperated by ',', atoms are seperated by '-'
+                Binding sites are seperated by ',' .
+                Elements are seperated by space.
         :return:
         """
+        state_str = ""
         if method == "K_priority":
-            state_str = ""
             for k_index, w_index, site in zip(state_list[0], state_list[1], ["0", "1", "2", "3", "4", "5"]):
                 sumK = len(k_index)
                 sumW = len(w_index)
@@ -166,7 +167,6 @@ class Sfilter:
                 else:
                     state_str += "0"
         elif method == "Co-occupy":
-            state_str = ""
             for k_index, w_index, site in zip(state_list[0], state_list[1], ["0", "1", "2", "3", "4", "5"]):
                 sumK = len(k_index)
                 sumW = len(w_index)
@@ -182,7 +182,6 @@ class Sfilter:
                 else:
                     state_str += "0"
         elif method == "Everything":
-            state_str = ""
             key_list = list(state_list.keys())
             for site in range(6):
                 for atom in key_list:
