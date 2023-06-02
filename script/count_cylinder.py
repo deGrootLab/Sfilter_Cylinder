@@ -147,7 +147,7 @@ class PermeationEvent:
                         ("2_1, SF outside in    ", self.safe_2_1_count)):
             lines.append(f"Number of {name} event : {len(i)}\n")
             for index, frame, res_time in i:
-                lines.append(f"{index} , frame {frame}, resident time : {res_time[0]},  {res_time[1]}\n")
+                lines.append(f"{index} , frame {frame}, resident time : {res_time[0] * time_step},  {res_time[1] * time_step}\n")
 
         for name, i in (("3_2, upper to membrane", self.safe_3_2_count),
                         ("2_3, membrane to upper", self.safe_2_3_count),
