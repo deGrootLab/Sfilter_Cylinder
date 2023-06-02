@@ -2,6 +2,8 @@
 
 # command line tool to run permeation counting
 import argparse
+import warnings
+
 from Sfilter import Sfilter
 import numpy as np
 import MDAnalysis as mda
@@ -291,10 +293,18 @@ if __name__ == "__main__":
             k_state = state_ts_dict["K"]
             o_state = state_ts_dict["Wat"]
             state_string = sf.state_2_string([k_state, o_state], method="K_priority")
+            for k_index, site in zip(k_state, ["0", "1", "2", "3", "4", "5"]):
+                sumK = len(k_index)
+                if sumK >= 2:
+                    warnings.warn(f"Number of K in site { site } is {sumK} in frame {ts.frame}")
         elif args.K_name == ["POT"]:
             k_state = state_ts_dict["POT"]
             o_state = state_ts_dict["Wat"]
             state_string = sf.state_2_string([k_state, o_state], method="K_priority")
+            for k_index, site in zip(k_state, ["0", "1", "2", "3", "4", "5"]):
+                sumK = len(k_index)
+                if sumK >= 2:
+                    warnings.warn(f"Number of K in site { site } is {sumK} in frame {ts.frame}")
         else:
             method = "Everything"
             state_string = sf.state_2_string(state_ts_dict, method="Everything")

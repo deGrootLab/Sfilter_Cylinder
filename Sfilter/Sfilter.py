@@ -160,8 +160,6 @@ class Sfilter:
                 sumW = len(w_index)
                 if sumK >= 1:
                     state_str += "K"
-                    if sumK >= 2:
-                        warnings.warn(f"Number of K in site { site } is more than 1. It's {sumK}")
                 elif sumW >= 1:
                     state_str += "W"
                 else:
