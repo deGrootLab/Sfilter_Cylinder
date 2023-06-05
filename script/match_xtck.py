@@ -214,16 +214,17 @@ if __name__ == "__main__":
     s2 = time_seq_list(cyl_list)
     l, s_list = longest_common_subsequence(s1, s2, {}, compare=match_xtck_cylinder_sfilter)
     print(f"Number of matched event found {l}")
-    print("# xtck               ,cylinder")
-    print("# index_1,           ,   index_0,  enter(ps),  leave(ps)")
+    print("# xtck   ,           ,          , cylinder")
+    print("# index_1,   time(ps), direction,   index_0,  enter(ps),  leave(ps), direction,")
+    direction_dict = {True: "up", False: "down"}
     for s_pair in s_list:
         xtck = s_pair[0]
         cyli = s_pair[1]
         if xtck == "None":
-            print(f"     None            , {cyli.at_index:9}, {cyli.time - cyli.resident_time:10}, {cyli.time:10}")
+            print(f"     None                       , {cyli.at_index:9}, {cyli.time - cyli.resident_time:10}, {cyli.time: 10}, {direction_dict[cyli.up]}")
         elif cyli == "None":
-            print(f"{xtck.at_index:9}, {xtck.time:10}, None")
+            print(f"{xtck.at_index:9}, {xtck.time:10}, {direction_dict[xtck.up]:9}, None")
         else:
             print(
-                f"{xtck.at_index:9}, {xtck.time:10}, {cyli.at_index:9}, {cyli.time - cyli.resident_time:10}, {cyli.time:10}")
+                f"{xtck.at_index:9}, {xtck.time:10}, {direction_dict[xtck.up]:9}, {cyli.at_index:9}, {cyli.time - cyli.resident_time:10}, {cyli.time:10}, {direction_dict[cyli.up]}")
 
