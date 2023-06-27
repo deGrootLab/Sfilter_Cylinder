@@ -113,9 +113,10 @@ class PermeationEvent:
         if len(self.down_1_count) == 0:
             lines.append("None\n")
         up_count_sum = len(self.up_1_count) - len(self.down_1_count)
-        current = (up_count_sum) * 1.602176634 / (time_step * self.frame) * 100000.0 * charge  # pA
+        current = (up_count_sum) * 1.602176634 / (time_step * self.frame-1) * 100000.0 * charge  # pA
         conductance = current * 1000 / voltage  # pS
         lines.append("\n#################################\n")
+        lines.append(f"time step in this xtc  : {time_step} ps\n")
         lines.append(f"Assumed voltage (mV)   : {voltage}\n" )
         lines.append(f"Simulation time (ns)   : {time_step * (self.frame - 1) / 1000}\n")
         lines.append(f"Permeation events up   : {len(self.up_1_count)}\n")
