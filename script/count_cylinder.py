@@ -258,6 +258,7 @@ if __name__ == "__main__":
     print("#################################################################################")
 
     u = mda.Universe(args.top.name, args.traj.name)
+    print(f"time step in this xtc is : {u.trajectory.dt} ps")
     sf = Sfilter(u)
     sf.detect_SF_sequence(args.SF_seq, args.SF_seq2)
     for site, atoms in zip(("S00", "S01", "S12", "S23", "S34", "S45"),
