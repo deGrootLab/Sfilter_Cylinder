@@ -1,0 +1,5 @@
+/Sfilter.egg-info
+
+# mdanalysis index file
+*.lock
+*.npz
