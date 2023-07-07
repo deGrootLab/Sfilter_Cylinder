@@ -11,8 +11,8 @@ Assumed voltage (mV)   : 300.0
 Simulation time (ns)   : 12.0
 Permeation events up   : 2
 Permeation events down : 0
-Ave current (pA)       : 26.48226
-Ave conductance (pS)   : 88.27419
+Ave current (pA)       : 26.48445
+Ave conductance (pS)   : 88.28149
 Minimum resident time up crossing   : 11700.0
 ###############################
 
