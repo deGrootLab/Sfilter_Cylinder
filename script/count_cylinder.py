@@ -9,6 +9,7 @@ import numpy as np
 import MDAnalysis as mda
 import sys
 import datetime
+import os
 
 
 class PermeationEvent:
@@ -17,11 +18,11 @@ class PermeationEvent:
         self.state_memory = np.zeros((len(ind), 3), dtype=int)
         self.resident_time = np.zeros((len(ind), 3), dtype=int)
         self.frame = 0
-        self.up_1_count   = []  # permeation up across 1
+        self.up_1_count = []  # permeation up across 1
         self.down_1_count = []  # permeation down across 1
-        self.up_3_count   = []
+        self.up_3_count = []
         self.down_3_count = []
-        self.up_4_count   = []
+        self.up_4_count = []
         self.down_4_count = []
         self.safe_1_2_count = []  # Safety check
         self.safe_2_1_count = []
@@ -63,7 +64,7 @@ class PermeationEvent:
                                (np.array([[3, 4, 1]]), self.up_4_count),
                                (np.array([[1, 4, 3]]), self.down_4_count),
                                ):
-                mask_event = np.logical_and( np.all(self.state_memory == seq, axis=1), ~mask_repeat)
+                mask_event = np.logical_and(np.all(self.state_memory == seq, axis=1), ~mask_repeat)
                 for i, res_time in zip(self.index[mask_event], self.resident_time[mask_event, 1]):
                     count.append([i, self.frame, res_time])
             for seq, count in ((np.array([[1, 2]]), self.safe_1_2_count),
@@ -96,7 +97,7 @@ class PermeationEvent:
                            ):
             mask_event = np.logical_and(np.all(self.state_memory == seq, axis=1), mask_cylinder)
             for i, res_time in zip(self.index[mask_event], self.resident_time[mask_event, 1]):
-                count.append([i, self.frame-1, res_time])
+                count.append([i, self.frame - 1, res_time])
 
     def write_result(self, file, charge, voltage, time_step):
         lines = []
@@ -113,11 +114,11 @@ class PermeationEvent:
         if len(self.down_1_count) == 0:
             lines.append("None\n")
         up_count_sum = len(self.up_1_count) - len(self.down_1_count)
-        current = (up_count_sum) * 1.602176634 / (time_step * self.frame-1) * 100000.0 * charge  # pA
+        current = (up_count_sum) * 1.602176634 / (time_step * self.frame - 1) * 100000.0 * charge  # pA
         conductance = current * 1000 / voltage  # pS
         lines.append("\n#################################\n")
         lines.append(f"time step in this xtc  : {time_step} ps\n")
-        lines.append(f"Assumed voltage (mV)   : {voltage}\n" )
+        lines.append(f"Assumed voltage (mV)   : {voltage}\n")
         lines.append(f"Simulation time (ns)   : {time_step * (self.frame - 1) / 1000}\n")
         lines.append(f"Permeation events up   : {len(self.up_1_count)}\n")
         lines.append(f"Permeation events down : {len(self.down_1_count)}\n")
@@ -150,7 +151,8 @@ class PermeationEvent:
                         ("2_1, SF outside in    ", self.safe_2_1_count)):
             lines.append(f"Number of {name} event : {len(i)}\n")
             for index, frame, res_time in i:
-                lines.append(f"{index} , frame {frame}, resident time (ps) : {res_time[0] * time_step},  {res_time[1] * time_step}\n")
+                lines.append(
+                    f"{index} , frame {frame}, resident time (ps) : {res_time[0] * time_step},  {res_time[1] * time_step}\n")
 
         for name, i in (("3_2, upper to membrane", self.safe_3_2_count),
                         ("2_3, membrane to upper", self.safe_2_3_count),
@@ -175,10 +177,36 @@ def state_label_convert(at_state_a):
     at_state_a = at_state_a - 10
     return at_state_a
 
+def prepare_state_str(sf, K_name, state_ts_dict):
+    if K_name == ["K"]:
+        k_state = state_ts_dict["K"]
+        o_state = state_ts_dict["Wat"]
+        state_string = sf.state_2_string([k_state, o_state], method="K_priority")
+        for k_index, site in zip(k_state, ["0", "1", "2", "3", "4", "5"]):
+            sumK = len(k_index)
+            if sumK >= 2:
+                warnings.warn(f"Number of K in site {site} is {sumK} in frame {ts.frame}")
+    elif K_name == ["POT"]:
+        k_state = state_ts_dict["POT"]
+        o_state = state_ts_dict["Wat"]
+        state_string = sf.state_2_string([k_state, o_state], method="K_priority")
+        for k_index, site in zip(k_state, ["0", "1", "2", "3", "4", "5"]):
+            sumK = len(k_index)
+            if sumK >= 2:
+                warnings.warn(f"Number of K in site {site} is {sumK} in frame {ts.frame}")
+    else:
+        state_string = sf.state_2_string(state_ts_dict, method="Everything")
+    return state_string
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=
+                                     """This is the program to run basic analysis for K channel MD simulation. You 
+                                     need a pdb/gro/tpr file as topology and a xtc trajectory file. The trajectory 
+                                     file should be properly centered. I would recommend centering on *ONE* oxygen atom
+                                     in S4, such as this command : gmx trjconv -s x.tpr -f x.xtc -o fix_atom_c.xtc 
+                                     -n index.ndx -pbc atom -ur compact -center. Centering on atoms from two chains will
+                                     fail.""", )
     parser.add_argument("-pdb",
                         dest="top",
                         help="Ideally This file should be generated from the same trjconv command as xtc. gro and tpr "
@@ -241,7 +269,20 @@ if __name__ == "__main__":
                         metavar="file name",
                         type=str,
                         default="perm_event.out",
-                        help="post fix for output, default perm_event.out",)
+                        help="post fix for output, default perm_event.out", )
+    # here are the arguments for the reducing-water trajectory
+    parser.add_argument("-n_water",
+                        dest="n_water",
+                        metavar="int",
+                        type=int,
+                        help="number of water molecules to keep",
+                        default=1000)
+    parser.add_argument("-reduced_xtc",
+                        dest="reduced_xtc",
+                        metavar="file name",
+                        type=argparse.FileType("w"),
+                        help="file name for the water-reduced xtc file", )
+
     args = parser.parse_args()
     now = datetime.datetime.now()
     print("#################################################################################")
@@ -256,6 +297,22 @@ if __name__ == "__main__":
     print(f"The cylinder radius is   : {args.cylRAD} Å")
     print(f"Radius cutoff for S0 is  : {args.s0_rad} Å")
     print(f"Z cutoff for S5 is       : {args.s5_cutoff} Å")
+    if args.reduced_xtc is None:
+        #  Output xtc name is not provided, no xtc output
+        print("No water-reduced xtc output")
+    else:
+        print(f"Water-reduced xtc output    : {args.reduced_xtc.name}")
+        print(f"The number of water to keep : {args.n_water}")
+        #  if file exists, delete it
+        if os.path.exists(args.reduced_xtc.name):
+            user_input = input("The file exists, do you want to overwrite it? y/Y or Ctrl-C")
+            if user_input.lower() == "y":
+                os.remove(args.reduced_xtc.name)
+            else:
+                sys.exit("User exit")
+        # check extension, only xtc is allowed
+        if os.path.splitext(args.reduced_xtc.name)[1][1:] not in ["xtc"]:
+            sys.exit("Only xtc is allowed for water-reduced trajectory")
     print("#################################################################################")
 
     u = mda.Universe(args.top.name, args.traj.name)
@@ -285,31 +342,14 @@ if __name__ == "__main__":
         for at_name in event_count_dict:
             at_selection = atom_selection_dict[at_name]
             at_state_a = sf.state_detect(at_selection)  # state array with the label for every atom
-            at_state_l = sf.state_2_list(at_state_a, at_selection)  # state list with the index of atoms in every binding site
+            at_state_l = sf.state_2_list(at_state_a,
+                                         at_selection)  # state list with the index of atoms in every binding site
             state_ts_dict[at_name] = at_state_l
             at_state_a = state_label_convert(at_state_a)
             event_count_dict[at_name].update(at_state_a)
 
         # if K Water system print as K_priority
-        if args.K_name == ["K"]:
-            k_state = state_ts_dict["K"]
-            o_state = state_ts_dict["Wat"]
-            state_string = sf.state_2_string([k_state, o_state], method="K_priority")
-            for k_index, site in zip(k_state, ["0", "1", "2", "3", "4", "5"]):
-                sumK = len(k_index)
-                if sumK >= 2:
-                    warnings.warn(f"Number of K in site { site } is {sumK} in frame {ts.frame}")
-        elif args.K_name == ["POT"]:
-            k_state = state_ts_dict["POT"]
-            o_state = state_ts_dict["Wat"]
-            state_string = sf.state_2_string([k_state, o_state], method="K_priority")
-            for k_index, site in zip(k_state, ["0", "1", "2", "3", "4", "5"]):
-                sumK = len(k_index)
-                if sumK >= 2:
-                    warnings.warn(f"Number of K in site { site } is {sumK} in frame {ts.frame}")
-        else:
-            method = "Everything"
-            state_string = sf.state_2_string(state_ts_dict, method="Everything")
+        state_string = prepare_state_str(sf, args.K_name, state_ts_dict)
         print("# S6l", ts.frame, state_string)
         for i in range(6):
             for at_name in state_ts_dict:
