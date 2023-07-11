@@ -76,6 +76,9 @@ class Perm_event_output:
     """
 
     def __init__(self, files):
+        """
+        :param files: pathlib.Path or str or a list of them
+        """
         if isinstance(files, Path) or isinstance(files, str):
             self.files = [files]
         elif isinstance(files, list):
@@ -233,6 +236,8 @@ def read_k_cylinder(file, method="K_priority"):
     Args:
         file: output file from k_cylinder
         method: "K_priority" or "Co-occupy"
+        In "K_priority", if there is a K in the binding site, letter K will be assigned.
+        In "Co-occupy", if there is a K and one or more water in the binding site, letter C will be assigned.
     return states as list
     """
     state_list = []
@@ -271,11 +276,12 @@ class Cylinder_output:
     def __init__(self, files, start=0, end=None, step=1, method="K_priority", time_step=None):
         """
         read output file from k_cylinder
-        :param files:
-        :param start:
-        :param end:
-        :param step:
-        :param method:
+        :param files: pathlib.Path or str or list of them. This should be the std_out from count_cylinder.py
+        :param start: default 0.
+        :param end: default None, final frame.
+        :param step: default 1, no slicing.
+        if you need to subsample the trajectory by slicing, you can provide start, end, step.
+        :param method: "K_priority" or "Co-occupy"
         :param time_step: The time step in the trajectory. If None, use the time step in the output file
         """
         if isinstance(files, Path) or isinstance(files, str):
