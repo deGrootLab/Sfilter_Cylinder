@@ -1,4 +1,6 @@
 /Sfilter.egg-info
+/.idea
+/build
 
 # mdanalysis index file
 *.lock

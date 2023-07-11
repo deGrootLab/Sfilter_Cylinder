@@ -10,7 +10,7 @@ setup(
     scripts=['script/count_cylinder.py',
              'script/match_xtck.py'
              ],
-    install_requires=["MDAnalysis", "numpy", "pandas", "scipy", "networkx", "matplotlib"
+    install_requires=["MDAnalysis", "numpy", "pandas", "scipy", "networkx", "matplotlib", "scipy"
         # List your package's dependencies here
     ],
 )
