@@ -10,7 +10,7 @@ import MDAnalysis as mda
 import sys
 import datetime
 import os
-
+from MDAnalysis.analysis import distances
 
 class PermeationEvent:
     def __init__(self, ind):
@@ -198,6 +198,49 @@ def prepare_state_str(sf, K_name, state_ts_dict):
         state_string = sf.state_2_string(state_ts_dict, method="Everything")
     return state_string
 
+def update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict):
+    state_ts_dict = {}
+    for at_name in event_count_dict:
+        at_selection = atom_selection_dict[at_name]
+        at_state_a = sf.state_detect(at_selection)  # state array with the label for every atom
+        at_state_l = sf.state_2_list(at_state_a,
+                                     at_selection)  # state list with the index of atoms in every binding site
+        state_ts_dict[at_name] = at_state_l
+        at_state_a = state_label_convert(at_state_a)
+        event_count_dict[at_name].update(at_state_a)
+
+    # if K/POT Water system print as K_priority, else print Everything
+    state_string = prepare_state_str(sf, args.K_name, state_ts_dict)
+    print("# S6l", ts.frame, state_string)
+    for i in range(6):
+        for at_name in state_ts_dict:
+            print(f" {at_name} : ", end="")
+            for index in state_ts_dict[at_name][i]:
+                print(index, end=" ")
+            print(end=",")
+        print()
+
+
+def get_closest_water(center_selection, water_O_selection, n_water, distance_array):
+    """
+    Input the center selection and water oxygen selection, return the closest n water molecules.
+    :param center_selection: MDAnalysis selection for the center.
+        We only measure the distance from the center of this selection.
+    :param water_O_selection: MDAnalysis selection for the water oxygen atoms.
+        Distance to every water oxygen atom will be measured.
+    :param n_water: number of water to be selected.
+        Only the closest n water will be returned.
+    :param distance_array: distance array for memory efficiency, shape should be (1, water_O_selection.n_atoms)
+    :return: A MDAnalysis selection for the closest n water molecules
+    """
+    center = center_selection.center_of_geometry()
+    dist_matrix = distances.distance_array(center, water_O_selection.positions,
+                                           box=water_O_selection.dimensions, result=distance_array)
+    closest_indices = dist_matrix.argsort()[:, :n_water]
+    closest_indices = closest_indices.reshape(-1)
+    closest_indices.sort()
+    closest_water = water_O_selection[closest_indices].residues.atoms
+    return closest_water
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=
@@ -210,7 +253,8 @@ if __name__ == "__main__":
     parser.add_argument("-pdb",
                         dest="top",
                         help="Ideally This file should be generated from the same trjconv command as xtc. gro and tpr "
-                             "are also acceptable",
+                             "are also acceptable. Water should have resname of SOL, and Water oxygen should have "
+                             "atom name of OW.",
                         metavar="top.pdb",
                         type=argparse.FileType('r'),
                         required=True)
@@ -280,7 +324,6 @@ if __name__ == "__main__":
     parser.add_argument("-reduced_xtc",
                         dest="reduced_xtc",
                         metavar="file name",
-                        type=argparse.FileType("w"),
                         help="file name for the water-reduced xtc file", )
 
     args = parser.parse_args()
@@ -298,21 +341,20 @@ if __name__ == "__main__":
     print(f"Radius cutoff for S0 is  : {args.s0_rad} Å")
     print(f"Z cutoff for S5 is       : {args.s5_cutoff} Å")
     if args.reduced_xtc is None:
-        #  Output xtc name is not provided, no xtc output
-        print("No water-reduced xtc output")
+        print("-reduced_xtc not provided, No water-reduced xtc output")
     else:
-        print(f"Water-reduced xtc output    : {args.reduced_xtc.name}")
+        print(f"Water-reduced xtc output    : {args.reduced_xtc}")
         print(f"The number of water to keep : {args.n_water}")
         #  if file exists, delete it
-        if os.path.exists(args.reduced_xtc.name):
-            user_input = input("The file exists, do you want to overwrite it? y/Y or Ctrl-C")
+        if os.path.exists(args.reduced_xtc):
+            user_input = input("The file exists, do you want to overwrite it? y/Y or Ctrl-C :")
             if user_input.lower() == "y":
-                os.remove(args.reduced_xtc.name)
+                os.remove(args.reduced_xtc)
             else:
                 sys.exit("User exit")
         # check extension, only xtc is allowed
-        if os.path.splitext(args.reduced_xtc.name)[1][1:] not in ["xtc"]:
-            sys.exit("Only xtc is allowed for water-reduced trajectory")
+        if os.path.splitext(args.reduced_xtc)[1][1:] not in ["xtc"]:
+            sys.exit("Only xtc is allowed for water-reduced trajectory. Exit")
     print("#################################################################################")
 
     u = mda.Universe(args.top.name, args.traj.name)
@@ -324,7 +366,7 @@ if __name__ == "__main__":
         print(site)
         for atom in atoms:
             print(f'{atom.resname} {atom.name}, Index (0 base): {atom.index}')
-    event_count_dict = {}
+    event_count_dict = {}  # key is atom name, value is PermeationEvent object
     atom_selection_dict = {}
     for atom in args.K_name:
         selection = sf.u.select_atoms('name ' + atom)
@@ -337,27 +379,27 @@ if __name__ == "__main__":
     atom_selection_dict["Wat"] = wat_selection
 
     print("# Loop Over Traj ################################################################################")
-    for ts in u.trajectory:
-        state_ts_dict = {}
-        for at_name in event_count_dict:
-            at_selection = atom_selection_dict[at_name]
-            at_state_a = sf.state_detect(at_selection)  # state array with the label for every atom
-            at_state_l = sf.state_2_list(at_state_a,
-                                         at_selection)  # state list with the index of atoms in every binding site
-            state_ts_dict[at_name] = at_state_l
-            at_state_a = state_label_convert(at_state_a)
-            event_count_dict[at_name].update(at_state_a)
+    if args.reduced_xtc is None:
+        for ts in u.trajectory:
+            update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict)
+    else:
+        # prepare the selection
+        if args.n_water > len(wat_selection):
+            sys.exit("The number of water to keep is larger than the number of water in the trajectory. Exit")
+        elif args.n_water <= 0:
+            sys.exit("The number of water to keep is smaller than 0. Exit")
 
-        # if K Water system print as K_priority
-        state_string = prepare_state_str(sf, args.K_name, state_ts_dict)
-        print("# S6l", ts.frame, state_string)
-        for i in range(6):
-            for at_name in state_ts_dict:
-                print(f" {at_name} : ", end="")
-                for index in state_ts_dict[at_name][i]:
-                    print(index, end=" ")
-                print(end=",")
-            print()
+        distance_array = np.zeros((1, wat_selection.n_atoms))  # prepare the distance matrix array on memory
+        non_water = u.select_atoms('not resname SOL')
+        with mda.Writer(args.reduced_xtc, n_atoms=non_water.n_atoms + args.n_water*3) as W:
+            for ts in u.trajectory:
+                # update permeation count
+                update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict)
+
+                # write the reduced trajectory
+                waters = get_closest_water(sf.sf_oxygen[-1], wat_selection, args.n_water, distance_array)
+                W.write(non_water + waters)
+
     print("#################################################################################")
     knows_charge_table = {"POT": 1, "K": 1,
                           "SOD": 1, "Na": 1,
