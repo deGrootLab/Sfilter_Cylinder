@@ -13,6 +13,12 @@ git clone https://github.com/huichenggong/Sfilter_Cylinder
 cd Sfilter_Cylinder
 pip install .
 ```
+### 1.3 add ipython kernel
+```bash
+conda activate Name_of_Env
+conda install ipykernel
+python -m ipykernel install --user
+```
 
 ## How to use it ?
 ```bash
