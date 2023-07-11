@@ -2,7 +2,15 @@
 This is a tool for basic analysis in Potassium Channel MD simulation.
 
 ## 1.Installation
+### 1.1 Prepare conda environment
 ```bash
+conda create -n Name_of Env python=3.11 MDAnalysis numpy pandas scipy networkx matplotlib scipy -c conda-forge
+conda activate Name_of_Env
+```
+### 1.2 Install Sfilter using pip
+```bash
+git clone https://github.com/huichenggong/Sfilter_Cylinder
+cd Sfilter_Cylinder
 pip install .
 ```
 
