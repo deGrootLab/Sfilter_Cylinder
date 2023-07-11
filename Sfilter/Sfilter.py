@@ -4,7 +4,7 @@ import warnings
 import numpy as np
 
 
-def detect_SF(u, SF_seq1, SF_seq2=[]):
+def detect_SF(u, SF_seq1, SF_seq2=None):
     """
     :param u: MDAnalysis.Universe
     :param SF_seq1: A list of 5 string, each string is a 3 letter amino acid name.
@@ -12,7 +12,8 @@ def detect_SF(u, SF_seq1, SF_seq2=[]):
     :param SF_seq2: In case of TRAAK/TREK2 channel, provide the sequence of the other half of SF
     :return: (S00, S01, S12, S23, S34, S45), each element is a MDAnalysis selection
     """
-
+    if SF_seq2 is None:
+        SF_seq2 = []
     if len(SF_seq1) != 5:
         raise ValueError("Length of SF sequence should be 5")
     elif len(SF_seq2) != 5 and len(SF_seq2) != 0:
@@ -57,7 +58,7 @@ class Sfilter:
         self.u = u
         self.sf_oxygen = ()
 
-    def detect_SF_sequence(self, SF_seq1, SF_seq2=[]):
+    def detect_SF_sequence(self, SF_seq1, SF_seq2=None):
         """
         :param SF_seq1: A list of 5 string, each string is a 3 letter amino acid name.
             such as ['THR', 'VAL', 'GLY', 'TYR', 'GLY']
