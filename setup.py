@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='Sfilter',
-    version='0.3',
+    version='0.4.0',
     description='This is a tool for basic analysis in Potassium Channel MD simulation.',
     author='Chenggong Hui',
     author_email='chenggong.hui@mpinat.mpg.de',

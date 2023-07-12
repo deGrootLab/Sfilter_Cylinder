@@ -46,7 +46,7 @@ class MyTestCase(unittest.TestCase):
         os.remove("file")
 
     def test_down(self):
-        print("\nTest PermeationEvent with down permeation event")
+        print("\n# Test PermeationEvent with down permeation event")
         seq = [np.array([1, 5]),
                np.array([5, 4]),
                np.array([4, 3]),
@@ -77,13 +77,16 @@ class MyTestCase(unittest.TestCase):
                "-K POT -SF_seq THR VAL GLY TYR GLY "
         xtc_out = "../test/01-NaK2K/1-Charmm/with_water/fix_10water.xtc"
         commands = ["count_cylinder.py " + args,
-                    "count_cylinder.py " + args + " -n_water 10 -reduced_xtc " + xtc_out,
+                    "count_cylinder.py " + args + " -n_water 10 -reduced_xtc " + xtc_out + " -non_wat nWat",
+                    "count_cylinder.py " + args + " -n_water 10 -reduced_xtc " + xtc_out + " -non_wat SF",
                     ]
         for command in commands:
             if os.path.isfile(xtc_out):
                 os.remove(xtc_out)
             results = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             res_text = results.stdout.decode('utf-8').split("\n")
+            res_err = results.stderr.decode('utf-8').split("\n")
+            print(res_err)
             letter_codes = []
             for line in res_text:
                 if "# S6l" in line:

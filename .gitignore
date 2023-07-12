@@ -1,6 +1,7 @@
 /Sfilter.egg-info
 /.idea
 /build
+/script/tmp.xtc
 
 # mdanalysis index file
 *.lock

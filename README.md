@@ -45,9 +45,17 @@ this is the time that the atom stays in the cylinder. This time should be safely
 time step. 
 
 ## 2.What can it do?
-### 1. Count ion permeation  
+### 2.1. Count ion permeation  
 ![permeation](ion-counting.jpg "permeation definition")
 Ion permeation is defined by sequentially passing though 4,1,3 compartment.  
-We provide a command line tool to run this counting. `count_cylinder.py`  
-### 2. Track binding site occupancy state
-`count_cylinder.py` will print what atom (index) is in each binding site.
+We provide a command line tool to run this counting. `count_cylinder.py`    
+
+### 2.2. Track binding site occupancy state
+`count_cylinder.py` will print what atom (index) is in each binding site.  
+
+### 2.3. Two output wrapper are provided
+`Cylinder_output` You can use this to load the std_out of `count_cylinder.py`. This includes the ion occupancy.  
+`Perm_event_output` You can use this to load the POT_perm_event.out. This includes the permeation event.
+
+### 2.4. MSM mechanism analysis
+Under development.  

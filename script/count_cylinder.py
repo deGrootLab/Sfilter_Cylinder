@@ -242,6 +242,43 @@ def get_closest_water(center_selection, water_O_selection, n_water, distance_arr
     closest_water = water_O_selection[closest_indices].residues.atoms
     return closest_water
 
+
+def prepare_non_water_SF(sf, K_name):
+    """
+    Prepare the non-water selection.
+    This selection would include all the atoms that we include in the permeation count.
+    :param sf: sf object
+    :param K_name: a list of atom names, such as ["POT", "SOD"]
+    :return: a MDAnalysis selection
+    """
+    non_water = sf.sf_oxygen[0].residues.atoms
+    for sf_O in sf.sf_oxygen[1:]:
+        non_water += sf_O.residues.atoms
+    for atom in K_name:
+        selection = sf.u.select_atoms('name ' + atom)
+        non_water += selection
+    return non_water
+
+# non_wat
+def prepare_non_water(sf, K_name, non_wat):
+    """
+    Prepare the non-water selection.
+    This selection would include all the atoms that we include in the permeation count.
+    Args:
+        sf: sf object
+        K_name: a list of atom names, such as ["POT", "SOD"]
+        non_wat: what non water atoms to select, only "nWat", "SF" have been implemented.
+    :return: a MDAnalysis selection
+    """
+    if non_wat == "nWat":  # all non-water atoms
+        non_water = sf.u.select_atoms('not resname SOL')
+    elif non_wat == "SF":  # only SF atoms
+        non_water = prepare_non_water_SF(sf, K_name)
+    else:
+        raise ValueError("non_wat should be either nWat or SF")
+    return non_water
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=
                                      """This is the program to run basic analysis for K channel MD simulation. You 
@@ -323,8 +360,15 @@ if __name__ == "__main__":
                         default=1000)
     parser.add_argument("-reduced_xtc",
                         dest="reduced_xtc",
-                        metavar="file name",
-                        help="file name for the water-reduced xtc file", )
+                        metavar="file_name",
+                        help="file name for the water-reduced xtc and pdb", )
+    parser.add_argument("-non_wat",
+                        dest="non_wat",
+                        metavar="non-water atoms",
+                        choices=["nWat", "SF"],
+                        default="nWat",
+                        help="non water atoms to keep, nWat or SF, default nWat",
+                        )
 
     args = parser.parse_args()
     now = datetime.datetime.now()
@@ -341,7 +385,7 @@ if __name__ == "__main__":
     print(f"Radius cutoff for S0 is  : {args.s0_rad} Å")
     print(f"Z cutoff for S5 is       : {args.s5_cutoff} Å")
     if args.reduced_xtc is None:
-        print("-reduced_xtc not provided, No water-reduced xtc output")
+        print("Argument -reduced_xtc not provided, No water-reduced xtc output")
     else:
         print(f"Water-reduced xtc output    : {args.reduced_xtc}")
         print(f"The number of water to keep : {args.n_water}")
@@ -379,26 +423,40 @@ if __name__ == "__main__":
     atom_selection_dict["Wat"] = wat_selection
 
     print("# Loop Over Traj ################################################################################")
-    if args.reduced_xtc is None:
+    if args.reduced_xtc is None:  # no water-reduced trajectory
         for ts in u.trajectory:
             update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict)
-    else:
-        # prepare the selection
-        if args.n_water > len(wat_selection):
+    else:  # write the water-reduced trajectory
+
+        if args.n_water > len(wat_selection):  # safety check on the number of water
             sys.exit("The number of water to keep is larger than the number of water in the trajectory. Exit")
         elif args.n_water <= 0:
             sys.exit("The number of water to keep is smaller than 0. Exit")
 
+        # prepare the selection(s)
         distance_array = np.zeros((1, wat_selection.n_atoms))  # prepare the distance matrix array on memory
-        non_water = u.select_atoms('not resname SOL')
+        print(f"The non-water atoms to keep are \"{args.non_wat}\"")
+        non_water = prepare_non_water(sf, args.K_name, args.non_wat)
+        print("The water-redueced pdb file is : " + os.path.splitext(args.reduced_xtc)[0] + f"_{args.non_wat}.pdb")
         with mda.Writer(args.reduced_xtc, n_atoms=non_water.n_atoms + args.n_water*3) as W:
             for ts in u.trajectory:
                 # update permeation count
                 update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict)
 
                 # write the reduced trajectory
-                waters = get_closest_water(sf.sf_oxygen[-1], wat_selection, args.n_water, distance_array)
+                waters = get_closest_water(sf.sf_oxygen[-2], wat_selection, args.n_water, distance_array)
                 W.write(non_water + waters)
+        # loop over trajectory ends here
+        # write a water-reduced pdb
+        u_pdb = mda.Universe(args.top.name)
+        sf_pdb = Sfilter(u_pdb)
+        sf_pdb.detect_SF_sequence(args.SF_seq, args.SF_seq2)
+        wat_selection = u_pdb.select_atoms('resname SOL and name OW')
+        non_water = prepare_non_water(sf_pdb, args.K_name, args.non_wat)
+        waters = get_closest_water(sf_pdb.sf_oxygen[-2], wat_selection, args.n_water, distance_array)
+
+        (non_water + waters).write(os.path.splitext(args.reduced_xtc)[0] + f"_{args.non_wat}.pdb")
+
 
     print("#################################################################################")
     knows_charge_table = {"POT": 1, "K": 1,
