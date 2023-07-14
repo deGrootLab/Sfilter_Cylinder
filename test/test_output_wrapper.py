@@ -58,9 +58,11 @@ class MyTestCase(unittest.TestCase):
     def test_get_state_distribution_CI_bootstrap(self):
         file = [f"04-output_wrapper/C_0.75_2ps/05-2ps/{i:02}/analysis/04-state-code/k_cylinder.log" for i in range(2)]
         cylinder_list = Cylinder_output(file)
-        state_distribution = cylinder_list.get_state_distribution_CI_bootstrap(n_resamples=200)
-        self.assertListEqual(state_distribution[0][:2], ["WKK0KW", (201 + 121) / 1002])
-        self.assertListEqual(state_distribution[1][:2], ["KK0KKW", (41 + 166) / 1002])
+        state_distribution = cylinder_list.get_state_distribution_CI_bootstrap_frame(n_resamples=200)
+        self.assertListEqual(state_distribution[0][0][:2], ["WKK0KW", 201 / 501])
+        self.assertListEqual(state_distribution[1][0][:2], ["WKK0KW", 121 / 501])
+        self.assertListEqual(state_distribution[0][1][:2], ["KK0KKW", 41  / 501])
+        self.assertListEqual(state_distribution[1][1][:2], ["KK0KKW", 166 / 501])
 
     def test_get_state_distribution_CI_bootstrap_traj(self):
         file = [f"04-output_wrapper/C_0.75_2ps/05-2ps/{i:02}/analysis/04-state-code/k_cylinder.log" for i in range(2)]

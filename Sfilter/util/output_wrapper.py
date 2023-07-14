@@ -330,7 +330,7 @@ class Cylinder_output:
             state_distribution.append(distri)
         return state_distribution, counter_list, counter_all
 
-    def get_state_distribution_CI_bootstrap(self, n_resamples=9999, confidence_level=0.95,
+    def get_state_distribution_CI_bootstrap_frame(self, n_resamples=9999, confidence_level=0.95,
                                             method='BCa', **kwargs):
         """
         Assume each frame is independent, and each trajectory is a different condition.
