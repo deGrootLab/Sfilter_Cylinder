@@ -4,7 +4,9 @@ This is a tool for basic analysis in Potassium Channel MD simulation.
 ## 1.Installation
 ### 1.1 Prepare conda environment
 ```bash
-conda create -n Name_of Env python=3.11 MDAnalysis numpy pandas scipy networkx matplotlib scipy -c conda-forge
+conda create -n Name_of_Env python=3.11 \
+  MDAnalysis numpy pandas scipy networkx matplotlib \
+  -c conda-forge -y
 conda activate Name_of_Env
 ```
 ### 1.2 Install Sfilter using pip
@@ -16,8 +18,15 @@ pip install .
 ### 1.3 add ipython kernel
 ```bash
 conda activate Name_of_Env
-conda install ipykernel
+conda install ipykernel -y
 python -m ipykernel install --user
+```
+
+### 1.X remove/uninstall
+```bash
+pip uninstall Sfilter
+jupyter kernelspec uninstall unwanted-kernel
+conda remove -n Name_of_Env --all  # You need to deactivate before this remove
 ```
 
 ## How to use it ?
@@ -26,6 +35,12 @@ cd test/01-NaK2K/1-Charmm/with_water
 count_cylinder.py -pdb ../em.gro \
   -xtc fix_atom_c_100ps.xtc -K POT \
   -SF_seq THR VAL GLY TYR GLY > k_cylinder.out
+
+count_cylinder.py -pdb ../em.gro \
+  -xtc fix_atom_c_100ps.xtc -K POT \
+  -SF_seq THR VAL GLY TYR GLY \
+  -n_water 400 -reduced_xtc fix_400wat.xtc -non_wat nWat
+  # You can get the water-reduced file fix_400wat_nWat.pdb and fix_400wat.xtc
   
 cd ../dry/
 count_cylinder.py -pdb em_dry.gro \

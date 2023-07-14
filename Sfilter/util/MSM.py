@@ -26,6 +26,61 @@ def matrix_to_df(matrix, msm, cut_off=0.01):
     return pd.DataFrame(data)
 
 
+def MFPT_A_to_B(traj, A, B):
+    """
+    compute mean first passage time from state A to state B
+    A -> B
+    alg1:
+    B A-A C A-A C-C-C B-B
+      ^               ^  8 steps
+    :param traj: a np.array of state int
+    :param A: int, node A
+    :param B: int, node B
+    :return:
+        MFPT_list, a list of FPT from state A to state B
+    """
+    map_A = traj == A
+    to_A = np.where(~map_A[:-1] & map_A[1:])[0] + 1  # search X to A transition
+    map_B = traj == B
+    to_B = np.where(~map_B[:-1] & map_B[1:])[0] + 1  # search X to B transition
+    if traj[0] == A:
+        to_A = np.insert(to_A, 0, 0)
+    elif traj[0] == B:
+        to_B = np.insert(to_B, 0, 0)
+
+    MFPT_list = []
+
+    if len(to_B) == 0:
+        return MFPT_list
+    elif len(to_B) == 1:
+        if len(to_A) == 0:
+            return MFPT_list
+        elif to_A[0] < to_B[0]:
+            return [to_B[0] - to_A[0]]
+        else:
+            return MFPT_list
+    else:
+        if len(to_A) == 0:
+            return MFPT_list
+        else:
+            ia = 0
+            if to_A[0] < to_B[0]:
+                ia = 1
+                MFPT_list.append(to_B[0] - to_A[0])
+            for b0, b1 in zip(to_B[:-1], to_B[1:]):
+                while ia < len(to_A):
+                    if to_A[ia] > b0:
+                        if to_A[ia] > b1:
+                            break
+                        else:
+                            MFPT_list.append(b1 - to_A[ia])
+                            break
+                    ia += 1
+            return MFPT_list
+
+
+
+
 class SF_msm:
     def __init__(self, file_list, start=0, end=None, step=1, method="K_priority"):
         """
@@ -181,16 +236,65 @@ class SF_msm:
             prediction.append(np.linalg.matrix_power(p_matrix_0, t))
         return np.array(reality), np.array(prediction)
 
-    def plot_CK_test(self, lag_step=1, test_time=[2, 4], ax=None, num_node=5):
+    # def plot_CK_test(self, lag_step=1, test_time=[2, 4], ax=None, num_node=5):
+    #     """
+    #     plot Chapman-Kolmogorov test result
+    #     :param lag_step: int, lag step
+    #     :param test_time: a list of int, a list of lag step you want to test
+    #     :param ax:
+    #     :param num_node: plot the first num_node nodes
+    #     :return:
+    #     """
+    #     pass
+
+
+    def get_MFPT_pair(self, A, B):
         """
-        plot Chapman-Kolmogorov test result
-        :param lag_step: int, lag step
-        :param test_time: a list of int, a list of lag step you want to test
-        :param ax:
-        :param num_node: plot the first num_node nodes
+        compute mean first passage time from state A to state B
+        A -> B
+        alg1:
+        B A-A C A-A C-C-C B-B
+          ^               ^  8 steps
+        :param A: int, node A
+        :param B: int, node B
         :return:
+            MFPT_list, a list of FPT from state A to state B, unit in step
         """
-        pass
+        MFPT_list = []
+        for traj in self.state_array:
+            MFPT_list += MFPT_A_to_B(traj, A, B)
+        return MFPT_list
+
+    def get_MFPT_matrix(self, population_cutoff=0.01):
+        """
+        compute mean first passage time for every node pairs above population_cutoff
+        Multiple algorithms are available,
+        A -> C
+        alg1:
+        C A-A B A-A B-B-B C-C
+          ^               ^  8 steps
+        :param lag_step:
+        :param population_cutoff:
+        :return:
+            MFPT_matrix, a numpy array, each element is the MFPT from state i to state j, unit in step*physical_time_step
+            FPT_list, each element is a list of FPT from state i to state j, unit in step
+        """
+        # find the node that is above the cutoff
+        total_count = self.node_counter.total()
+        for n, node_count in self.node_counter.items():
+            if node_count / total_count < population_cutoff:
+                break
+        MFPT_matrix = np.zeros((n, n), dtype=np.float64)
+        FPT_list = []
+        for i in range(n):
+            FPT_list.append([])
+            for j in range(n):
+                if i == j:
+                    continue
+                fpt_ij = self.get_MFPT_pair(i, j)
+                FPT_list[i].append(fpt_ij)
+                MFPT_matrix[i, j] = np.mean(fpt_ij) * self.time_step[0]
+        return MFPT_matrix, FPT_list
 
     def get_matrix(self, lag_step=1, physical_time=None):
         """
@@ -295,7 +399,7 @@ class SF_msm:
     def merge_until(self, rate_cut_off, rate_square_cut_off, node_cut_off=0.01, step_cut_off=30, lag_step=1, physical_time=None,
                     method="rate_square", min_node=3):
         """
-        Merge states until a certain the maximum rate is larger than the rate_cut_off
+        Merge states until a certain cutoff
         I suggest to set rate_cut_off as 0.5/physical_time or smaller
         input:
             rate_cut_off: the maximum rate of the merged states

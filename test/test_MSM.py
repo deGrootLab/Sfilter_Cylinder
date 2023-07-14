@@ -159,6 +159,45 @@ class MyTestCase(unittest.TestCase):
         self.assertListEqual(msm.int_2_s[0], ["B", "A"])
         self.assertListEqual(msm.int_2_s[1], ["D", "C"])
 
+    def test_MFPT_A_to_B(self):
+        traj_list = [(np.array("B A A C A A C C C B B".split()), [8]),
+                     #            ^---------------^
+                     (np.array("B C A A C A A C C C B B".split()), [8]),
+                     #              ^---------------^
+                     (np.array("A C A".split()), []),
+                     (np.array("A B A A C A A C C C B B".split()), [1, 8]),
+                     #          ^-^ ^---------------^
+                     (np.array("A C A B C X A B A".split()), [3, 1]),
+                     #          ^-----^     ^-^
+                     (np.array("C C A C A B C X A B A".split()), [3, 1]),
+                     #              ^-----^     ^-^
+                     (np.array("C B A C A B C X A B A".split()), [3, 1]),
+                     #              ^-----^     ^-^
+                     ]
+        for traj, answer in traj_list:
+            mfpt_list = MSM.MFPT_A_to_B(traj, "A", "B")
+            self.assertListEqual(mfpt_list, answer)
+
+    def test_MFPT_pair(self):
+        file_list = [f"04-output_wrapper/C_0.75_2ps/05-2ps/{i:02}/analysis/04-state-code/k_cylinder.log" for i in
+                     range(2)]
+        msm = MSM.SF_msm(file_list)
+        msm.calc_state_array()
+        mfpt_01 = msm.get_MFPT_pair(0, 1)
+        self.assertListEqual(mfpt_01[:2], [152, 71])
+
+    def test_MFPT_matrix(self):
+        file_list = [f"04-output_wrapper/C_0.75_2ps/05-2ps/{i:02}/analysis/04-state-code/k_cylinder.log" for i in
+                     range(2)]
+        msm = MSM.SF_msm(file_list)
+        msm.calc_state_array()
+        mfpt_01 = msm.get_MFPT_pair(0, 1)
+        MFPT_matrix, FPT_list = msm.get_MFPT_matrix()
+
+
+
+
+
 
 
 

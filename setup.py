@@ -7,10 +7,6 @@ setup(
     author='Chenggong Hui',
     author_email='chenggong.hui@mpinat.mpg.de',
     packages=find_packages(),
-    scripts=['script/count_cylinder.py',
-             'script/match_xtck.py'
-             ],
-    install_requires=["MDAnalysis", "numpy", "pandas", "scipy", "networkx", "matplotlib", "scipy"
-        # List your package's dependencies here
-    ],
+    scripts=['script/count_cylinder.py', 'script/match_xtck.py'],
+    install_requires=["MDAnalysis", "numpy", "pandas", "scipy", "networkx", "matplotlib"],
 )
