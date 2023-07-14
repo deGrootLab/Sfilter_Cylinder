@@ -273,10 +273,10 @@ class SF_msm:
         alg1:
         C A-A B A-A B-B-B C-C
           ^               ^  8 steps
-        :param lag_step:
         :param population_cutoff:
         :return:
-            MFPT_matrix, a numpy array, each element is the MFPT from state i to state j, unit in step*physical_time_step
+            MFPT_matrix: a numpy array, each element is the MFPT from state i to state j, unit in step*physical_time_step,
+                         If no transition found, np.inf is used
             FPT_list, each element is a list of FPT from state i to state j, unit in step
         """
         # find the node that is above the cutoff
@@ -293,7 +293,10 @@ class SF_msm:
                     continue
                 fpt_ij = self.get_MFPT_pair(i, j)
                 FPT_list[i].append(fpt_ij)
-                MFPT_matrix[i, j] = np.mean(fpt_ij) * self.time_step[0]
+                if len(fpt_ij) == 0:
+                    MFPT_matrix[i, j] = np.inf
+                else:
+                    MFPT_matrix[i, j] = np.mean(fpt_ij) * self.time_step[0]
         return MFPT_matrix, FPT_list
 
     def get_matrix(self, lag_step=1, physical_time=None):
@@ -395,6 +398,55 @@ class SF_msm:
             raise ValueError("method must be rate_T, rate, or rate_square")
         f_list = sorted(f_list, key=lambda x: x[2], reverse=True)
         return f_list, (t_matrix, net_t_matrix, rate_matrix, p_matrix), node_num
+
+
+    def lump_MFPT(self, node_cut_off=0.01, min_node=3):
+        """
+        Run one step of Lumping according to MFPT (as the inversed rate)
+        :param min_node:
+        :return:
+        """
+        total_count = self.node_counter.total()
+        for n, node_count in self.node_counter.items():
+            if node_count / total_count < node_cut_off:
+                break
+        # check node number
+        if n < min_node:
+            return False, copy.deepcopy(self.merge_list), [0,0]
+        # get MFPT
+        MFPT_matrix, FPT_list = self.get_MFPT_matrix(node_cut_off)
+        MFPT_matrix_sqare = MFPT_matrix * MFPT_matrix.T
+        mfpt_list = []
+        for i in range(len(MFPT_matrix_sqare)):
+            for j in range(0, i):
+                mfpt_list.append([i, j, MFPT_matrix_sqare[i, j]])
+        mfpt_list = sorted(mfpt_list, key=lambda x: x[2])
+        n_0, n_1, mfpt = mfpt_list[0]
+        if len(self.int_2_s[n_0]) > 1 and len(self.int_2_s[n_1]) > 1:
+            merge_list_new = copy.deepcopy(self.merge_list)
+            for node in self.merge_list:
+                for node2 in self.merge_list:
+                    if node == self.int_2_s[n_0] and node2 == self.int_2_s[n_1]:
+                        merge_list_new.remove(node)
+                        merge_list_new.remove(node2)
+                        merge_list_new.append(node + node2)
+        elif len(self.int_2_s[n_0]) > 1 or len(self.int_2_s[n_1]) > 1:
+            merge_list_new = []
+            for node in self.merge_list:
+                if node == self.int_2_s[n_0]:
+                    merge_list_new.append(node + self.int_2_s[n_1])
+                elif node == self.int_2_s[n_1]:
+                    merge_list_new.append(self.int_2_s[n_0] + node)
+                else:
+                    merge_list_new.append(node)
+        elif len(self.int_2_s[n_0]) == 1 or len(self.int_2_s[n_1]) == 1:
+            merge_list_new = copy.deepcopy(self.merge_list)
+            merge_list_new.append(self.int_2_s[n_0] + self.int_2_s[n_1])
+        else:
+            raise ValueError("merge error " + str(n_0) + str(n_1))
+        return True, merge_list_new, [self.int_2_s[n_0], self.int_2_s[n_1]]
+
+
 
     def merge_until(self, rate_cut_off, rate_square_cut_off, node_cut_off=0.01, step_cut_off=30, lag_step=1, physical_time=None,
                     method="rate_square", min_node=3):

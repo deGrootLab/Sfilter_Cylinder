@@ -19,7 +19,7 @@ pip install .
 ```bash
 conda activate Name_of_Env
 conda install ipykernel -y
-python -m ipykernel install --user
+python -m ipykernel install --user --name Name_of_ipykernel
 ```
 
 ### 1.X remove/uninstall
