@@ -7,6 +7,7 @@
 None
 
 #################################
+time step in this xtc  : 100.0 ps
 Assumed voltage (mV)   : 300.0
 Simulation time (ns)   : 12.0
 Permeation events up   : 2
