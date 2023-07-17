@@ -119,15 +119,22 @@ class Perm_event_output:
 
     def get_conductance(self, voltage=300):
         """
+        Use the number of permeation events to compute the conductance. If the voltage is not specified, use the voltage
+        from meta_data
         get averaged conductance, with s.e.m. of different trajectories
         Args:
             voltage: voltage in mV
-        :return:
+        :return: ave_conductance, SEM, conductance_list
             average conductance in pS
             s.e.m. of conductance in pS if there are more than one trajectory, otherwise None
             a list of conductance from each trajectory
         """
 
+        if voltage is None:
+            for m in self.meta_data:
+                if m["voltage"] != self.meta_data[0]["voltage"]:
+                    raise ValueError("voltage is not specified and different trajectories have different voltages")
+            voltage = self.meta_data[0]["voltage"]
         # calculate conductance for part of the trajectory
         conductance_list = []
         for df, time in zip(self.perm_list, self.sim_time):

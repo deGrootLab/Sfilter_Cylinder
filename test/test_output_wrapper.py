@@ -31,6 +31,11 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(len(p_list.perm_list[0]), 21)
         self.assertAlmostEqual(p_list.meta_data[0]["time"], 1e5)
 
+    def test_Perm_event_output_get_conductance(self):
+        files = [f"04-output_wrapper/C_0.75_2ps/05-2ps/{i:02d}/analysis/04-state-code/POT_perm_event.out" for i in range(2)]
+        p_list = Perm_event_output(files)
+        conductance, cond_SEM, c_list = p_list.get_conductance()
+
 
     def test_cylinder_output_init(self):
         file = [f"04-output_wrapper/C_0.75_2ps/05-2ps/{i:02}/analysis/04-state-code/k_cylinder.log" for i in range(2)]
