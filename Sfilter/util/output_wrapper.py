@@ -117,7 +117,7 @@ class Perm_event_output:
             self.meta_data[i]["time"] = time
             self.sim_time[i] = time
 
-    def get_conductance(self, voltage=300):
+    def get_conductance(self, voltage=None):
         """
         Use the number of permeation events to compute the conductance. If the voltage is not specified, use the voltage
         from meta_data
@@ -302,7 +302,10 @@ class Cylinder_output:
         for s_list, meta_data in [read_k_cylinder(f, method) for f in self.files]:
             self.state_str.append(s_list[start:end:step])
             if time_step is None:
-                meta_data["time_step"] *= step
+                if "time_step" not in meta_data:
+                    raise ValueError("time_step is not provided in the output file, please provide it manually")
+                else:
+                    meta_data["time_step"] *= step
             else:
                 meta_data["time_step"] = time_step * step
             self.meta_data.append(meta_data)
