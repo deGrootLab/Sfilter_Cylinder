@@ -198,11 +198,11 @@ def prepare_state_str(sf, K_name, state_ts_dict):
         state_string = sf.state_2_string(state_ts_dict, method="Everything")
     return state_string
 
-def update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict):
+def update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict, s5_z_cutoff=4, r_cutoff=2.5, s0_r_cutoff=4):
     state_ts_dict = {}
     for at_name in event_count_dict:
         at_selection = atom_selection_dict[at_name]
-        at_state_a = sf.state_detect(at_selection)  # state array with the label for every atom
+        at_state_a = sf.state_detect(at_selection, s5_z_cutoff, r_cutoff, s0_r_cutoff)  # state array with the label for every atom
         at_state_l = sf.state_2_list(at_state_a,
                                      at_selection)  # state list with the index of atoms in every binding site
         state_ts_dict[at_name] = at_state_l
@@ -425,7 +425,8 @@ if __name__ == "__main__":
     print("# Loop Over Traj ################################################################################")
     if args.reduced_xtc is None:  # no water-reduced trajectory
         for ts in u.trajectory:
-            update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict)
+            update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict,
+                                    s5_z_cutoff=args.s5_cutoff, r_cutoff=args.cylRAD, s0_r_cutoff=args.s0_rad)
     else:  # write the water-reduced trajectory
 
         if args.n_water > len(wat_selection):  # safety check on the number of water
@@ -441,7 +442,8 @@ if __name__ == "__main__":
         with mda.Writer(args.reduced_xtc, n_atoms=non_water.n_atoms + args.n_water*3) as W:
             for ts in u.trajectory:
                 # update permeation count
-                update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict)
+                update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict,
+                                        s5_z_cutoff=args.s5_cutoff, r_cutoff=args.cylRAD, s0_r_cutoff=args.s0_rad)
 
                 # write the reduced trajectory
                 waters = get_closest_water(sf.sf_oxygen[-2], wat_selection, args.n_water, distance_array)
