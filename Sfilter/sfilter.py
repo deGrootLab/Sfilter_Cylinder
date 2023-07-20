@@ -50,7 +50,7 @@ def detect_SF(u, SF_seq1, SF_seq2=None):
     return S00, S01, S12, S23, S34, S45
 
 
-class Sfilter:
+class sfilter:
     def __init__(self, u):
         """
         :type u: object MDAnalysis.Universe
