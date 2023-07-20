@@ -2,7 +2,7 @@ import unittest
 import sys
 from count_cylinder import PermeationEvent
 from count_cylinder import get_closest_water
-from Sfilter import Sfilter
+from Sfilter import sfilter
 import MDAnalysis as mda
 import numpy as np
 import subprocess
@@ -127,7 +127,7 @@ class MyTestCase(unittest.TestCase):
         print("\n# Test if we can iteratively find the closest water")
         u = mda.Universe("../test/01-NaK2K/1-Charmm/em.pdb",
                          "../test/01-NaK2K/1-Charmm/with_water/fix_atom_c_100ps.xtc")
-        sf = Sfilter(u)
+        sf = sfilter(u)
         sf.detect_SF_sequence(SF_seq1="THR VAL GLY TYR GLY".split())
         s45 = sf.sf_oxygen[-1]
         water_O_selection = u.select_atoms('resname SOL and name OW')

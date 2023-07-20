@@ -4,7 +4,8 @@
 import argparse
 import warnings
 
-from Sfilter import Sfilter
+import Sfilter as S_package
+from Sfilter import sfilter
 import numpy as np
 import MDAnalysis as mda
 import sys
@@ -281,12 +282,12 @@ def prepare_non_water(sf, K_name, non_wat):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=
-                                     """This is the program to run basic analysis for K channel MD simulation. You 
-                                     need a pdb/gro/tpr file as topology and a xtc trajectory file. The trajectory 
-                                     file should be properly centered. I would recommend centering on *ONE* oxygen atom
-                                     in S4, such as this command : gmx trjconv -s x.tpr -f x.xtc -o fix_atom_c.xtc 
-                                     -n index.ndx -pbc atom -ur compact -center. Centering on atoms from two chains will
-                                     fail.""", )
+                                     f"""Version {S_package.__version__}. This is the program to run basic analysis 
+                                     for K channel MD simulation. You need a pdb/gro/tpr file as topology and a xtc 
+                                     trajectory file. The trajectory file should be properly centered. I would 
+                                     recommend centering on *ONE* oxygen atom in S4, such as this command : gmx 
+                                     trjconv -s x.tpr -f x.xtc -o fix_atom_c.xtc -n index.ndx -pbc atom -ur compact 
+                                     -center. Centering on atoms from two chains will fail.""", )
     parser.add_argument("-pdb",
                         dest="top",
                         help="Ideally This file should be generated from the same trjconv command as xtc. gro and tpr "
@@ -373,6 +374,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     now = datetime.datetime.now()
     print("#################################################################################")
+    print(f"Sfilter Version {S_package.__version__}")
     print("Time :", now.strftime("%Y-%m-%d %H:%M:%S"))
     print("The command you used is :")
     print(" ".join(sys.argv))
@@ -403,7 +405,7 @@ if __name__ == "__main__":
 
     u = mda.Universe(args.top.name, args.traj.name)
     print(f"time step in this xtc is : {u.trajectory.dt} ps")
-    sf = Sfilter(u)
+    sf = sfilter(u)
     sf.detect_SF_sequence(args.SF_seq, args.SF_seq2)
     for site, atoms in zip(("S00", "S01", "S12", "S23", "S34", "S45"),
                            sf.sf_oxygen):
@@ -451,7 +453,7 @@ if __name__ == "__main__":
         # loop over trajectory ends here
         # write a water-reduced pdb
         u_pdb = mda.Universe(args.top.name)
-        sf_pdb = Sfilter(u_pdb)
+        sf_pdb = sfilter(u_pdb)
         sf_pdb.detect_SF_sequence(args.SF_seq, args.SF_seq2)
         wat_selection = u_pdb.select_atoms('resname SOL and name OW')
         non_water = prepare_non_water(sf_pdb, args.K_name, args.non_wat)
