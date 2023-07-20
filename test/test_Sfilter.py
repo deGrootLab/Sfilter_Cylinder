@@ -13,7 +13,7 @@ class MyTestCase(unittest.TestCase):
                      "01-NaK2K/1-Charmm/dry/em_dry.gro"
                      ]:
             u = mda.Universe(file)
-            sf = Sfilter.Sfilter(u)
+            sf = Sfilter.sfilter(u)
             sf.detect_SF_sequence(['THR', 'VAL', 'GLY', 'TYR', 'GLY'])
             s00, s01, s12, s23, s34, s45 = sf.sf_oxygen
             self.assertListEqual(s00.ix.tolist(), [int(i) - 1 for i in "754 2244 3734 5224".split()])
@@ -26,7 +26,7 @@ class MyTestCase(unittest.TestCase):
     def test_detect_SF_sequence_NaK2K_amber(self):
         print("# TEST detect_SF_sequence NaK2K Amber")
         u = mda.Universe("01-NaK2K/2-Amber/em.pdb")
-        sf = Sfilter.Sfilter(u)
+        sf = Sfilter.sfilter(u)
         sf.detect_SF_sequence(['THR', 'VAL', 'GLY', 'TYR', 'GLY'])
         s00, s01, s12, s23, s34, s45 = sf.sf_oxygen
         self.assertListEqual(s00.ix.tolist(), [int(i) - 1 for i in "754 2244 3734 5224".split()])
@@ -39,7 +39,7 @@ class MyTestCase(unittest.TestCase):
     def test_detect_SF_sequence_TRAAK_charmm(self):
         print("# TEST detect_SF_sequence TRAAK Charmm")
         u = mda.Universe("02-TRAAK/1-Charmm/em.pdb")
-        sf = Sfilter.Sfilter(u)
+        sf = Sfilter.sfilter(u)
         sf.detect_SF_sequence(['THR', 'ILE', 'GLY', 'TYR', 'GLY'], ['THR', 'VAL', 'GLY', 'PHE', 'GLY'])
         s00, s01, s12, s23, s34, s45 = sf.sf_oxygen
         self.assertListEqual(s00.ix.tolist(), [int(i) - 1 for i in "1609 3342 5645 7378".split()])
@@ -52,7 +52,7 @@ class MyTestCase(unittest.TestCase):
     def test_state_detect(self):
         print("# TEST state_detect")
         u = mda.Universe("01-NaK2K/1-Charmm/em.pdb", "01-NaK2K/1-Charmm/with_water/fix_atom_c_100ps.xtc")
-        sf = Sfilter.Sfilter(u)
+        sf = Sfilter.sfilter(u)
         sf.detect_SF_sequence(['THR', 'VAL', 'GLY', 'TYR', 'GLY'])
         K = sf.u.select_atoms('name POT or name K')
         K_state_list = []
@@ -82,7 +82,7 @@ class MyTestCase(unittest.TestCase):
     def test_state_2_string(self):
         print("# TEST state_2_string")
         u = mda.Universe("01-NaK2K/1-Charmm/em.pdb", "01-NaK2K/1-Charmm/with_water/fix_atom_c_100ps.xtc")
-        sf = Sfilter.Sfilter(u)
+        sf = Sfilter.sfilter(u)
         sf.detect_SF_sequence(['THR', 'VAL', 'GLY', 'TYR', 'GLY'])
         K = sf.u.select_atoms('name POT or name K')
         O = sf.u.select_atoms('resname SOL and name OW')
