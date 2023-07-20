@@ -51,6 +51,26 @@ class MyTestCase(unittest.TestCase):
         self.assertDictEqual(msm.state_counter, {"A": 11, "B": 7, "C": 3})
         self.assertDictEqual(msm.node_counter, {0: 18, 1: 3})
 
+    def test_SF_msm_get_transition_matrix(self):
+        msm = MSM.SF_msm([])
+        msm.set_state_str(["A A B C A B C A B C A B C A B".split()])
+        msm.calc_state_array()
+        f_matrix_1 = msm.get_transition_matrix(lag_step=1)
+        f_matrix_2 = msm.get_transition_matrix(lag_step=2)
+        f_matrix_3 = msm.get_transition_matrix(lag_step=3)
+        self.assertListEqual(f_matrix_1.tolist(), [[1, 5, 0], [0, 0, 4], [4, 0, 0]])
+        self.assertListEqual(f_matrix_2.tolist(), [[0, 1, 4], [4, 0, 0], [0, 4, 0]])
+        self.assertListEqual(f_matrix_3.tolist(), [[4, 0, 1], [0, 4, 0], [0, 0, 3]])
+        msm.time_step = [1]
+        r_1 = msm.get_rate_matrix(lag_step=1)
+        r_2 = msm.get_rate_matrix(lag_step=2)
+        r_3 = msm.get_rate_matrix(lag_step=3)
+        self.assertListEqual(r_1.tolist(), [[0, 5/6, 0], [0, 0, 4/5], [4/4, 0, 0]])
+        self.assertListEqual(r_2.tolist(), [[0, 1/6, 4/6], [4/5, 0, 0], [0, 4/4, 0]])
+        self.assertListEqual(r_3.tolist(), [[0, 0, 1/6], [0, 0, 0], [0, 0, 0]])
+
+
+
     def test_SF_msm_get_matrix(self):
         msm = MSM.SF_msm([])
         msm.set_state_str(["A B A B A B C D".split(),
@@ -145,7 +165,7 @@ class MyTestCase(unittest.TestCase):
                            "A B A B A B A B A B A D C D D C C D D".split(),
                            "B A B A B A B A B A B D D C D C C D D E D".split()])
         msm.calc_state_array()
-        reason = msm.merge_until(rate_cut_off=0.00, rate_square_cut_off=0.00, node_cut_off=0.017, lag_step=1, physical_time=1, method="rate_square", min_node=1)
+        reason = msm.merge_until(rate_cut_off=0.00, rate_square_cut_off=0.00, node_cut_off=0.017, lag_step=1, physical_time=1, method="rate_square", min_node=2)
         t_matrix, net_t_matrix, rate_matrix, p_matrix = msm.get_matrix(lag_step=1, physical_time=1)
         print()
         print(reason)
