@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
-
+import Sfilter
 
 class PermEvent:
     def __init__(self, at_index: int, time, up=True):
@@ -227,4 +227,5 @@ if __name__ == "__main__":
         else:
             print(
                 f"{xtck.at_index:9}, {xtck.time:10}, {direction_dict[xtck.up]:9}, {cyli.at_index:9}, {cyli.time - cyli.resident_time:10}, {cyli.time:10}, {direction_dict[cyli.up]}")
+    print(f"Version: {Sfilter.__version__}")
 
