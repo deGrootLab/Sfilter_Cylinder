@@ -39,6 +39,8 @@ def MFPT_A_to_B(traj, A, B):
     :return:
         MFPT_list, a list of FPT from state A to state B
     """
+    if A == B:
+        raise ValueError("When calculating MFPT, A and B should not be the same")
     map_A = traj == A
     to_A = np.where(~map_A[:-1] & map_A[1:])[0] + 1  # search X to A transition
     map_B = traj == B
@@ -318,13 +320,15 @@ class SF_msm:
             FPT_list.append([])
             for j in range(n):
                 if i == j:
-                    continue
-                fpt_ij = self.get_MFPT_pair(i, j)
-                FPT_list[i].append(fpt_ij)
-                if len(fpt_ij) == 0:
-                    MFPT_matrix[i, j] = np.inf
+                    fpt_ij = []
+                    FPT_list[i].append(fpt_ij)
                 else:
-                    MFPT_matrix[i, j] = np.mean(fpt_ij) * self.time_step[0]
+                    fpt_ij = self.get_MFPT_pair(i, j)
+                    FPT_list[i].append(fpt_ij)
+                    if len(fpt_ij) == 0:
+                        MFPT_matrix[i, j] = np.inf
+                    else:
+                        MFPT_matrix[i, j] = np.mean(fpt_ij) * self.time_step[0]
         return MFPT_matrix, FPT_list
 
     def get_matrix(self, lag_step=1, physical_time=None):
@@ -618,11 +622,17 @@ class SF_msm:
         return reason
 
 
-def states_2_name(node):
+def states_2_name(node, index=None):
     """
     Convert a list of states to a string
     """
-    string = ""
+    if index is None:
+        string = ""
+    elif len(node) <= 1:
+        string = f"{index}:"
+    else:
+        string = f"{index} : \n"
+
     for s in node[:-1]:
         string += s
         string += "\n"
@@ -630,9 +640,10 @@ def states_2_name(node):
     return string
 
 
-def plot_net_T_matrix(ax, msm, cut_off, edge_cutoff, net_t_matrix, iterations=6,k=15,
+def plot_net_T_matrix(ax, msm, cut_off, edge_cutoff, net_t_matrix, iterations, k, position=None,
                       colors=plt.rcParams['axes.prop_cycle'].by_key()['color'],
-                      text_bbox={"boxstyle": "round", "ec": (1.0, 1.0, 1.0), "fc": (1.0, 1.0, 1.0)}
+                      text_bbox={"boxstyle": "round", "ec": (1.0, 1.0, 1.0), "fc": (1.0, 1.0, 1.0)}, add_index=True,
+                      edge_factor=100
                       ):
     """
     Wrap up function to plot net transition matrix
@@ -646,7 +657,10 @@ def plot_net_T_matrix(ax, msm, cut_off, edge_cutoff, net_t_matrix, iterations=6,
     # prepare node with name and color
     node_colors = []
     for i in range(node_num):
-        name = states_2_name(msm.int_2_s[i])
+        if add_index:
+            name = states_2_name(msm.int_2_s[i], i)
+        else:
+            name = states_2_name(msm.int_2_s[i])
         G.add_node(i, label=name)
         K_number = msm.int_2_s[i][0].count("K") + msm.int_2_s[i][0].count("C")
         node_colors.append(colors[K_number])
@@ -659,30 +673,35 @@ def plot_net_T_matrix(ax, msm, cut_off, edge_cutoff, net_t_matrix, iterations=6,
                 G.add_edge(i, j, weight=net_t_matrix[i, j])
                 e_list.append((i, j))
 
-    # prepare initial position of each node
-    node_positions = {}
-    for i in range(node_num):
-        node_positions[i] = list(computer_pos(msm.int_2_s[i]))
+    # prepare position of each node, if position is not given, use spring_layout
+    if position is None:
+        node_positions = {}
+        for i in range(node_num):
+            node_positions[i] = list(computer_pos(msm.int_2_s[i]))
+        node_positions = nx.spring_layout(G, pos=node_positions, iterations=iterations, k=k)
+    else:
+        node_positions = position
+
+    # prepare node size
     node_sizes = []
     counter = msm.node_counter
     frame_sum = sum(counter.values())
     for i in range(node_num):
         node_sizes.append(counter[i] / frame_sum * 4000)
-    node_positions = nx.spring_layout(G, pos=node_positions, iterations=iterations, k=k)
 
     # plt
 
     nx.draw_networkx_nodes(G, ax=ax, pos=node_positions, node_color=node_colors, node_size=node_sizes, alpha=0.7)
     nx.draw_networkx_labels(G, ax=ax, pos=node_positions, labels=nx.get_node_attributes(G, 'label'),
                             font_family='monospace')
-    width = [nx.get_edge_attributes(G, 'weight')[i] / 100 for i in G.edges()]
+    width = [nx.get_edge_attributes(G, 'weight')[i] / edge_factor for i in G.edges()]
     nx.draw_networkx_edges(G, ax=ax, pos=node_positions, width=width, connectionstyle='arc3,rad=0.05',
-                           alpha=0.5, arrowsize=15, node_size=np.array(node_sizes) * 2.5)
+                           alpha=0.5, arrowsize=15, node_size=np.array(node_sizes) * 2.0)
     nx.draw_networkx_edge_labels(G, node_positions, edge_labels=nx.get_edge_attributes(G, 'weight'), ax=ax,
                                  bbox=text_bbox
                                  )
 
-    return e_list
+    return e_list, node_positions
 
 
 def letter_code_pos(string):

@@ -5,7 +5,7 @@ This is a tool for basic analysis in Potassium Channel MD simulation.
 ### 1.1 Prepare conda environment
 ```bash
 conda create -n Name_of_Env python=3.11 \
-  MDAnalysis numpy pandas scipy networkx matplotlib \
+  MDAnalysis numpy pandas scipy networkx matplotlib pyemma \
   -c conda-forge -y
 conda activate Name_of_Env
 ```
