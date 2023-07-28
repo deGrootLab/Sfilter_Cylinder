@@ -13,6 +13,7 @@ import datetime
 import os
 from MDAnalysis.analysis import distances
 
+
 class PermeationEvent:
     def __init__(self, ind):
         self.index = ind
@@ -178,6 +179,7 @@ def state_label_convert(at_state_a):
     at_state_a = at_state_a - 10
     return at_state_a
 
+
 def prepare_state_str(sf, K_name, state_ts_dict):
     if K_name == ["K"]:
         k_state = state_ts_dict["K"]
@@ -199,11 +201,13 @@ def prepare_state_str(sf, K_name, state_ts_dict):
         state_string = sf.state_2_string(state_ts_dict, method="Everything")
     return state_string
 
+
 def update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict, s5_z_cutoff=4, r_cutoff=2.5, s0_r_cutoff=4):
     state_ts_dict = {}
     for at_name in event_count_dict:
         at_selection = atom_selection_dict[at_name]
-        at_state_a = sf.state_detect(at_selection, s5_z_cutoff, r_cutoff, s0_r_cutoff)  # state array with the label for every atom
+        at_state_a = sf.state_detect(at_selection, s5_z_cutoff, r_cutoff,
+                                     s0_r_cutoff)  # state array with the label for every atom
         at_state_l = sf.state_2_list(at_state_a,
                                      at_selection)  # state list with the index of atoms in every binding site
         state_ts_dict[at_name] = at_state_l
@@ -258,21 +262,33 @@ def prepare_non_water_SF(sf, K_name):
     for atom in K_name:
         selection = sf.u.select_atoms('name ' + atom)
         non_water += selection
+    # reordering the atoms
+    non_water = non_water.residues.atoms
     return non_water
+
 
 # non_wat
 def prepare_non_water(sf, K_name, non_wat):
     """
     Prepare the non-water selection.
     This selection would include all the atoms that we include in the permeation count.
+    Water (resname SOL) must come after the non-water atoms in the provided topology.
     Args:
         sf: sf object
         K_name: a list of atom names, such as ["POT", "SOD"]
         non_wat: what non water atoms to select, only "nWat", "SF" have been implemented.
+            if "nWat", all non-water atoms will be selected.
+            if "SF", only the SF atoms.
     :return: a MDAnalysis selection
     """
+    # check water comes after non-water atoms
+    min_water_index = np.min(sf.u.select_atoms('resname SOL').residues.atoms.ix)
+    max_non_water_index = np.max(sf.u.select_atoms('not resname SOL').residues.atoms.ix)
+    if min_water_index < max_non_water_index:
+        raise ValueError("Water (resname SOL) must come after non-water atoms in the provided topology.")
     if non_wat == "nWat":  # all non-water atoms
-        non_water = sf.u.select_atoms('not resname SOL')
+        non_water = sf.u.select_atoms(
+            'not resname SOL')  # select_atoms() sorts the atoms by atom index before returning them
     elif non_wat == "SF":  # only SF atoms
         non_water = prepare_non_water_SF(sf, K_name)
     else:
@@ -441,7 +457,7 @@ if __name__ == "__main__":
         print(f"The non-water atoms to keep are \"{args.non_wat}\"")
         non_water = prepare_non_water(sf, args.K_name, args.non_wat)
         print("The water-redueced pdb file is : " + os.path.splitext(args.reduced_xtc)[0] + f"_{args.non_wat}.pdb")
-        with mda.Writer(args.reduced_xtc, n_atoms=non_water.n_atoms + args.n_water*3) as W:
+        with mda.Writer(args.reduced_xtc, n_atoms=non_water.n_atoms + args.n_water * 3) as W:
             for ts in u.trajectory:
                 # update permeation count
                 update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict,
@@ -460,7 +476,6 @@ if __name__ == "__main__":
         waters = get_closest_water(sf_pdb.sf_oxygen[-2], wat_selection, args.n_water, distance_array)
 
         (non_water + waters).write(os.path.splitext(args.reduced_xtc)[0] + f"_{args.non_wat}.pdb")
-
 
     print("#################################################################################")
     knows_charge_table = {"POT": 1, "K": 1,
