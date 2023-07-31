@@ -202,12 +202,16 @@ def prepare_state_str(sf, K_name, state_ts_dict):
     return state_string
 
 
-def update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict, s5_z_cutoff=4, r_cutoff=2.5, s0_r_cutoff=4):
+def update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict,
+                            s5_z_cutoff, s5_r_cutoff, r_cutoff, s0_r_cutoff):
     state_ts_dict = {}
     for at_name in event_count_dict:
         at_selection = atom_selection_dict[at_name]
-        at_state_a = sf.state_detect(at_selection, s5_z_cutoff, r_cutoff,
-                                     s0_r_cutoff)  # state array with the label for every atom
+        at_state_a = sf.state_detect(at_selection,
+                                     s5_z_cutoff=s5_z_cutoff,
+                                     s5_r_cutoff=s5_r_cutoff,
+                                     r_cutoff=r_cutoff,
+                                     s0_r_cutoff=s0_r_cutoff)  # state array with the label for every atom
         at_state_l = sf.state_2_list(at_state_a,
                                      at_selection)  # state list with the index of atoms in every binding site
         state_ts_dict[at_name] = at_state_l
@@ -343,12 +347,18 @@ if __name__ == "__main__":
                         help="Radius of the S0 in Å. Default 4",
                         type=float,
                         default=4)
-    parser.add_argument("-S5_cutoff",
-                        dest="s5_cutoff",
+    parser.add_argument("-S5_z_cutoff",
+                        dest="s5_z_cutoff",
                         metavar="float",
                         help="Z cutoff of the S5 in Å. Default value is 4. You might see double occupation",
                         type=float,
                         default=4)
+    parser.add_argument("-S5_r_cutoff",
+                        dest="s5_r_cutoff",
+                        metavar="float",
+                        help="Radius cutoff of the S5 in Å. Default value is 8. You might see double occupation",
+                        type=float,
+                        default=8)
     parser.add_argument("-SF_seq",
                         dest="SF_seq",
                         metavar="list of string",
@@ -401,7 +411,8 @@ if __name__ == "__main__":
     print("The sequence of the SF is:", args.SF_seq, args.SF_seq2)
     print(f"The cylinder radius is   : {args.cylRAD} Å")
     print(f"Radius cutoff for S0 is  : {args.s0_rad} Å")
-    print(f"Z cutoff for S5 is       : {args.s5_cutoff} Å")
+    print(f"Z cutoff for S5 is       : {args.s5_z_cutoff} Å")
+    print(f"r cutoff for S5 is       : {args.s5_r_cutoff} Å")
     if args.reduced_xtc is None:
         print("Argument -reduced_xtc not provided, No water-reduced xtc output")
     else:
@@ -444,7 +455,10 @@ if __name__ == "__main__":
     if args.reduced_xtc is None:  # no water-reduced trajectory
         for ts in u.trajectory:
             update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict,
-                                    s5_z_cutoff=args.s5_cutoff, r_cutoff=args.cylRAD, s0_r_cutoff=args.s0_rad)
+                                    s5_z_cutoff=args.s5_z_cutoff,
+                                    s5_r_cutoff=args.s5_r_cutoff,
+                                    r_cutoff=args.cylRAD,
+                                    s0_r_cutoff=args.s0_rad)
     else:  # write the water-reduced trajectory
 
         if args.n_water > len(wat_selection):  # safety check on the number of water
@@ -461,7 +475,10 @@ if __name__ == "__main__":
             for ts in u.trajectory:
                 # update permeation count
                 update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict,
-                                        s5_z_cutoff=args.s5_cutoff, r_cutoff=args.cylRAD, s0_r_cutoff=args.s0_rad)
+                                        s5_z_cutoff=args.s5_z_cutoff,
+                                        s5_r_cutoff=args.s5_r_cutoff,
+                                        r_cutoff=args.cylRAD,
+                                        s0_r_cutoff=args.s0_rad)
 
                 # write the reduced trajectory
                 waters = get_closest_water(sf.sf_oxygen[-2], wat_selection, args.n_water, distance_array)
@@ -471,7 +488,7 @@ if __name__ == "__main__":
         u_pdb = mda.Universe(args.top.name)
         sf_pdb = sfilter(u_pdb)
         sf_pdb.detect_SF_sequence(args.SF_seq, args.SF_seq2)
-        wat_selection = u_pdb.select_atoms('resname SOL')
+        wat_selection = u_pdb.select_atoms('resname SOL and name OW')
         non_water = prepare_non_water(sf_pdb, args.K_name, args.non_wat)
         waters = get_closest_water(sf_pdb.sf_oxygen[-2], wat_selection, args.n_water, distance_array)
 
