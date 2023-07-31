@@ -471,7 +471,7 @@ if __name__ == "__main__":
         u_pdb = mda.Universe(args.top.name)
         sf_pdb = sfilter(u_pdb)
         sf_pdb.detect_SF_sequence(args.SF_seq, args.SF_seq2)
-        wat_selection = u_pdb.select_atoms('resname SOL and name OW')
+        wat_selection = u_pdb.select_atoms('resname SOL')
         non_water = prepare_non_water(sf_pdb, args.K_name, args.non_wat)
         waters = get_closest_water(sf_pdb.sf_oxygen[-2], wat_selection, args.n_water, distance_array)
 
