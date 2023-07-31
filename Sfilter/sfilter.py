@@ -83,7 +83,7 @@ class sfilter:
                 warnings.warn("Number if atoms in " + name + "is not 4.", UserWarning)
         self.sf_oxygen = (s00, s01, s12, s23, s34, s45)
 
-    def state_detect(self, K, s5_z_cutoff=4, r_cutoff=2.5, s0_r_cutoff=4):
+    def state_detect(self, K, s5_z_cutoff=4, s5_r_cutoff=8, r_cutoff=2.5, s0_r_cutoff=4, ):
         """
         :param K: MDAnalysis Universe (atoms selection)
         :param s5_z_cutoff: S5 cutoff from THR oxygen
@@ -98,9 +98,10 @@ class sfilter:
         8   | 2 |  8
             | 3 |
             | 4 |
-            | 5 |
         --------------
-             6
+            | 5 |
+           ------
+                   6
         """
         s00, s01, s12, s23, s34, s45 = self.sf_oxygen
         z_00 = np.mean(s00.positions[:, 2])
@@ -125,16 +126,20 @@ class sfilter:
         z_state[z_K < z_45 - s5_z_cutoff] = 6
         # print(xy.shape)
         r_2 = (x_K - xy[0]) ** 2 + (y_K - xy[1]) ** 2
-        mask = np.logical_and((z_state < 5), (z_state > 0))
-        z_state[np.logical_and(mask, (r_2 > r_cutoff ** 2))] = 8  # incase something is inside the membrance
-        z_state[np.logical_and(z_state == 0, (r_2 > (s0_r_cutoff) ** 2))] = 7  # due to the membrane curvature,
-                                                                               # outside S0 would assign 7
+        # mask = np.logical_and((z_state < 5), (z_state > 0))
+        mask = (z_state < 5) & (z_state > 0) & (r_2 > r_cutoff ** 2)
+        z_state[mask] = 8  # incase something is inside the membrance
+
+        mask = (z_state == 0) & (r_2 > s0_r_cutoff ** 2)
+        z_state[mask] = 7  # xy outside S0 would be assigned as 7
+
+        mask = (z_state == 5) & (r_2 > s5_r_cutoff ** 2)
+        z_state[mask] = 6  # xy outside S5 would be assigned as 6
         return z_state
 
 
     def state_2_string(self, state_list,  method="K_priority"):
         """
-
         :param state_list: A list of lists containing the index of what atoms in each binding site.
             such as :
             [[S0_K_index, S1_K_index, S2_K_index, S3_K_index, S4_K_index, S5_K_index],

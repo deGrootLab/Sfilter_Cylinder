@@ -108,6 +108,18 @@ class MyTestCase(unittest.TestCase):
         for state, xtck in zip(state_str_c_list, answer):
             self.assertEqual(state[1:5], xtck)
 
+    def test_state_detect_Scav_01(self):
+        print("# TEST. Make sure s5_r_cutoff take effect")
+        u = mda.Universe("01-NaK2K/2-Amber/em.pdb", "01-NaK2K/2-Amber/output_file.xtc")
+        sf = Sfilter.sfilter(u)
+        sf.detect_SF_sequence(['THR', 'VAL', 'GLY', 'TYR', 'GLY'])
+        O = sf.u.select_atoms('index 54017')
+        ts = u.trajectory[1]
+        o_array = sf.state_detect(O, s5_z_cutoff=4, s5_r_cutoff=8, r_cutoff=2.5, s0_r_cutoff=4, )
+        self.assertEqual(o_array[0], 6)
+        o_array = sf.state_detect(O, s5_z_cutoff=4, s5_r_cutoff=30, r_cutoff=2.5, s0_r_cutoff=4, )
+        self.assertEqual(o_array[0], 5)
+
 
 if __name__ == '__main__':
     unittest.main()
