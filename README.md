@@ -18,7 +18,7 @@ pip install .
 ### 1.3 add ipython kernel
 ```bash
 conda activate Name_of_Env
-conda install ipykernel -y
+conda install ipykernel ipywidgets -c conda-forge -y
 python -m ipykernel install --user --name Name_of_ipykernel
 ```
 
