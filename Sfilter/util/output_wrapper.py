@@ -58,6 +58,8 @@ def read_cylinder(cylinder_file):
                 meta_data_dict["ave_current"] = float(l.split(":")[1])
             elif "Ave conductance (pS)" in l:
                 meta_data_dict["ave_conductance"] = float(l.split(":")[1])
+            elif "Sfilter Version" in l:
+                meta_data_dict["version"] = l.split()[-1]
 
             i += 1
         df = pd.DataFrame({"index": p_index,
@@ -253,7 +255,9 @@ def read_k_cylinder(file, method="K_priority"):
         lines = f.readlines()
         meta_data = {}
         for l in lines:
-            if "time step in this xtc is" in l:
+            if "Sfilter Version" in l:
+                meta_data["version"] = l.split()[-1]
+            elif "time step in this xtc is" in l:
                 meta_data["time_step"] = float(l.split()[-2])
                 break
         if method == "K_priority":

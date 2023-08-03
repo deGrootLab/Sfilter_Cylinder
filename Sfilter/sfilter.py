@@ -86,7 +86,8 @@ class sfilter:
     def state_detect(self, K, s5_z_cutoff=4, s5_r_cutoff=8, r_cutoff=2.5, s0_r_cutoff=4, ):
         """
         :param K: MDAnalysis Universe (atoms selection)
-        :param s5_z_cutoff: S5 cutoff from THR oxygen
+        :param s5_z_cutoff: S5 z cutoff from THR oxygen
+        :param s5_r_cutoff: S5 radius cutoff
         :param r_cutoff: radius cutoff for inside the selectivity filter
         :param s0_r_cutoff:
         :return: np.array( dtype=np.uint8), what state is each K atom in
