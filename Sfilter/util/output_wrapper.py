@@ -221,7 +221,11 @@ class Perm_event_output:
 
 def line_to_state(line):
     """
-    convert a line of k_cylinder output to state string
+    convert a line of k_cylinder output to a state code
+    return:
+        state_str: "0" for empty, "W" for water, "C" for cation, "K" for potassium
+        n_pot: number of potassium
+        n_wat: number of water
     """
     pot, wat = line.split(",")[:2]
     n_pot = len(pot.split(":")[1].split())
@@ -236,7 +240,7 @@ def line_to_state(line):
         state_str = "K"
     else:
         raise ValueError("n_pot and n_wat should be positive")
-    return state_str
+    return state_str, n_pot, n_wat
 
 
 def read_k_cylinder(file, method="K_priority"):
@@ -247,7 +251,11 @@ def read_k_cylinder(file, method="K_priority"):
         method: "K_priority" or "Co-occupy"
         In "K_priority", if there is a K in the binding site, letter K will be assigned.
         In "Co-occupy", if there is a K and one or more water in the binding site, letter C will be assigned.
-    return states as list
+    return:
+        state_list, states string is a list
+        meta_data, a dict
+        K_occupency, a list of K occupancy
+        W_occupency, a list of W occupancy
     """
     state_list = []
 
@@ -260,26 +268,49 @@ def read_k_cylinder(file, method="K_priority"):
             elif "time step in this xtc is" in l:
                 meta_data["time_step"] = float(l.split()[-2])
                 break
+        K_occupency = []
+        W_occupency = []
         if method == "K_priority":
-            for l in lines:
+            i = 0
+            while i < len(lines):
+                l = lines[i]
                 if "# S6l" in l:
-                    s = l.split()[-1]
-                    state_list.append(s)
+                    state_list.append(l.split()[-1])
+                    K_occupency.append([])
+                    W_occupency.append([])
+                    for j in range(1, 7):
+                        s_code, n_pot, n_wat = line_to_state(lines[i + j])
+                        K_occupency[-1].append(n_pot)
+                        W_occupency[-1].append(n_wat)
+                    i += 6
+                else:
+                    i += 1
+            # for l in lines:
+            #     if "# S6l" in l:
+            #         K_occupency.append([])
+            #         W_occupency.append([])
+            #         s = l.split()[-1]
+            #         state_list.append(s)
         elif method == "Co-occupy":
             i = 0
             while i < len(lines):
                 l = lines[i]
                 state_str = ""
                 if "# S6l" in l:
+                    K_occupency.append([])
+                    W_occupency.append([])
                     for j in range(1, 7):
-                        state_str += line_to_state(lines[i + j])
+                        s_code, n_pot, n_wat = line_to_state(lines[i + j])
+                        state_str += s_code
+                        K_occupency[-1].append(n_pot)
+                        W_occupency[-1].append(n_wat)
                     state_list.append(state_str)
                     i += 6
                 else:
                     i += 1
         else:
             raise ValueError("method should be K_priority or Co-occupy")
-    return state_list, meta_data
+    return state_list, meta_data, K_occupency, W_occupency
 
 
 # class for reading (a list of) std_out
@@ -303,7 +334,7 @@ class Cylinder_output:
             raise TypeError("files must be a list of str or str")
         self.state_str = []
         self.meta_data = []
-        for s_list, meta_data in [read_k_cylinder(f, method) for f in self.files]:
+        for s_list, meta_data, K_occupency, W_occupency in [read_k_cylinder(f, method) for f in self.files]:
             self.state_str.append(s_list[start:end:step])
             if time_step is None:
                 if "time_step" not in meta_data:
