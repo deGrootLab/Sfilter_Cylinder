@@ -103,7 +103,7 @@ class SF_msm:
             pass
         elif isinstance(file_list, str):
             file_list = [file_list]
-        for traj, meta_data in [read_k_cylinder(file, method) for file in file_list]:
+        for traj, meta_data, K_occupency, W_occupency in [read_k_cylinder(file, method) for file in file_list]:
             self.state_str.append(traj[start:end:step])
             self.time_step.append(meta_data["time_step"] * step)
         flattened = [num for sublist in self.state_str for num in sublist]

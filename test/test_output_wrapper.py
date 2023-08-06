@@ -11,8 +11,11 @@ class MyTestCase(unittest.TestCase):
                  " POT : 5961 , Wat : ,\n",
                  " POT : 5960 , Wat : ,\n",
                  " POT : 5959 , Wat : 29864 38630 40004 40109 42965 43178 44273 44456 44522 46910 47849 48983 55532 60080 60440 ,\n",]
-        for l, answer in zip(lines, ["W", "K", "0", "K", "K", "C"]):
-            self.assertEqual(Sfilter.util.output_wrapper.line_to_state(l), answer)
+        for l, state_str_ref, n_pot_ref, n_wat_ref  in zip(lines, ["W", "K", "0", "K", "K", "C"], [0, 1, 0, 1, 1, 1], [2, 0, 0, 0, 0, 15]):
+            state_str, n_pot, n_wat = Sfilter.util.output_wrapper.line_to_state(l)
+            self.assertEqual(state_str, state_str_ref)
+            self.assertEqual(n_pot, n_pot_ref)
+            self.assertEqual(n_wat, n_wat_ref)
 
     def test_Perm_event_output_read_file(self):
         files = ["03-longest_common_sequence/03-state-code/POT_perm_event.out",
