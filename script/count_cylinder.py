@@ -340,7 +340,7 @@ if __name__ == "__main__":
                         metavar="float",
                         help="Radius of the cylinder in Å. Default 2.5",
                         type=float,
-                        default=2.5)
+                        default=3.5)
     parser.add_argument("-S0_Rad",
                         dest="s0_rad",
                         metavar="float",
@@ -358,7 +358,7 @@ if __name__ == "__main__":
                         metavar="float",
                         help="Radius cutoff of the S5 in Å. Default value is 8. You might see double occupation",
                         type=float,
-                        default=8)
+                        default=9)
     parser.add_argument("-SF_seq",
                         dest="SF_seq",
                         metavar="list of string",
