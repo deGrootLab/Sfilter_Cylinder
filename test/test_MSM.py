@@ -51,6 +51,16 @@ class MyTestCase(unittest.TestCase):
         self.assertDictEqual(msm.state_counter, {"A": 11, "B": 7, "C": 3})
         self.assertDictEqual(msm.node_counter, {0: 18, 1: 3})
 
+    def test_set_state_array(self):
+        msm = MSM.SF_msm([])
+        msm.set_state_array([np.array("1 0 1 0 1".split()),
+                             np.array("1 0 1 0 0".split())])
+        self.assertListEqual(msm.state_str[0], ["1", "0", "1", "0", "1"])
+        self.assertListEqual(msm.state_str[1], ["1", "0", "1", "0", "0"])
+        self.assertDictEqual(msm.state_counter, {"1": 5, "0": 5})
+        self.assertDictEqual(msm.s_2_int, {"1": 1, "0": 0})
+        self.assertDictEqual(msm.int_2_s, {0: ["0"], 1: ["1"]})
+
     def test_SF_msm_get_transition_matrix(self):
         msm = MSM.SF_msm([])
         msm.set_state_str(["A A B C A B C A B C A B C A B".split()])
@@ -213,6 +223,16 @@ class MyTestCase(unittest.TestCase):
         msm.calc_state_array()
         mfpt_01 = msm.get_MFPT_pair(0, 1)
         MFPT_matrix, FPT_list = msm.get_MFPT_matrix()
+
+    # plot
+    def test_computer_pos(self):
+        node = "WKKKWK"
+        x, y = MSM.computer_pos(node, end=5)
+        print(x, y)
+        node = "K0KKW0"
+        x, y = MSM.computer_pos(node, end=5)
+        print(x, y)
+
 
 
 

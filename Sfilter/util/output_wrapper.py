@@ -60,6 +60,8 @@ def read_cylinder(cylinder_file):
                 meta_data_dict["ave_conductance"] = float(l.split(":")[1])
             elif "Sfilter Version" in l:
                 meta_data_dict["version"] = l.split()[-1]
+            elif "time step in this xtc" in l:
+                meta_data_dict["time_step"] = float(l.split()[-2])
 
             i += 1
         df = pd.DataFrame({"index": p_index,
@@ -279,7 +281,10 @@ def read_k_cylinder(file, method="K_priority"):
                     K_occupency.append([])
                     W_occupency.append([])
                     for j in range(1, 7):
-                        s_code, n_pot, n_wat = line_to_state(lines[i + j])
+                        try:
+                            s_code, n_pot, n_wat = line_to_state(lines[i + j])
+                        except:
+                            raise ValueError(i+j, lines[i + j], "There is something wrong with this line")
                         K_occupency[-1].append(n_pot)
                         W_occupency[-1].append(n_wat)
                     i += 6
@@ -334,6 +339,12 @@ class Cylinder_output:
             raise TypeError("files must be a list of str or str")
         self.state_str = []
         self.meta_data = []
+        data_list = []
+        for f in self.files:
+            try:
+                data_list.append(read_k_cylinder(f, method))
+            except:
+                raise ValueError(f, "\nThere is problem in this file")
         for s_list, meta_data, K_occupency, W_occupency in [read_k_cylinder(f, method) for f in self.files]:
             self.state_str.append(s_list[start:end:step])
             if time_step is None:

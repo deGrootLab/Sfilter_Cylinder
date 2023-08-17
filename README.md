@@ -21,12 +21,20 @@ conda activate Name_of_Env
 conda install ipykernel ipywidgets -c conda-forge -y
 python -m ipykernel install --user --name Name_of_ipykernel
 ```
+### 1.4 update when there is a new version
+```bash
+cd XXX/Sfilter_Cylinder
+git pull
+conda activate Name_of_Env
+pip install .         
+count_cylinder.py -h  # check version
+```
 
 ### 1.X remove/uninstall
 ```bash
 pip uninstall Sfilter
-jupyter kernelspec uninstall unwanted-kernel
-conda remove -n Name_of_Env --all  # You need to deactivate before this remove
+jupyter kernelspec uninstall unwanted-kernel  # replace this with the name of your kernel
+conda remove -n Name_of_Env --all  # You need to deactivate the env before this removing
 ```
 
 ## How to use it ?

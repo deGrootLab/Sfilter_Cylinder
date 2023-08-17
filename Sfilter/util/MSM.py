@@ -118,6 +118,39 @@ class SF_msm:
         flattened = [num for sublist in self.state_str for num in sublist]
         self.state_counter = Counter(flattened)
 
+    def set_state_array(self, state_array):
+        """
+        set state_array
+        update
+            self.state_counter, a Counter, state to number of occurrence
+            self.state_str, a list of trajectories, each trajectory is a list of state string
+            int_2_s and s_2_int
+        """
+        if self.state_str is None or self.state_str == []:
+            self.state_str = []
+        else:
+            raise ValueError("state_str is exist. You should not set state_str based on state_array")
+        self.state_array = state_array
+        if isinstance(state_array, list):
+            for traj_array in state_array:
+                self.state_str.append([str(i) for i in traj_array])
+        elif isinstance(state_array, np.ndarray):
+            self.state_str.append([str(i) for i in state_array])
+        else:
+            raise ValueError("state_array must be list or np.ndarray")
+
+        # update self.state_counter
+        flattened = [num for sublist in self.state_str for num in sublist]
+        self.state_counter = Counter(flattened)
+
+        # update int_2_s and s_2_int
+        self.int_2_s = {}
+        self.s_2_int = {}
+        for i in self.state_counter:
+            self.int_2_s[int(i)] = [i]
+            self.s_2_int[i] = int(i)
+
+
     def calc_state_array(self, merge_list=None):
         """
         convert state_str to state_array
@@ -662,7 +695,7 @@ def plot_net_T_matrix(ax, msm, cut_off, edge_cutoff, net_t_matrix, iterations, k
         else:
             name = states_2_name(msm.int_2_s[i])
         G.add_node(i, label=name)
-        K_number = msm.int_2_s[i][0].count("K") + msm.int_2_s[i][0].count("C")
+        K_number = msm.int_2_s[i][0][:5].count("K") + msm.int_2_s[i][0][:5].count("C")
         node_colors.append(colors[K_number])
 
     # prepare edge
@@ -677,7 +710,7 @@ def plot_net_T_matrix(ax, msm, cut_off, edge_cutoff, net_t_matrix, iterations, k
     if position is None:
         node_positions = {}
         for i in range(node_num):
-            node_positions[i] = list(computer_pos(msm.int_2_s[i]))
+            node_positions[i] = list(computer_pos(msm.int_2_s[i], end=5))
         node_positions = nx.spring_layout(G, pos=node_positions, iterations=iterations, k=k)
     else:
         node_positions = position
@@ -711,7 +744,7 @@ def letter_code_pos(string):
     The number of "K" and "C" is the x coordinate, and the center of mass of the string is the y coordinate.
     """
     weight_dict = {"K": 1,
-                   "W": 0.5,
+                   "W": 0.2,
                    "C": 1.5,
                    "0": 0, }
     center_mass = 0
@@ -724,16 +757,16 @@ def letter_code_pos(string):
     return x, center_mass
 
 
-def computer_pos(strings):
+def computer_pos(strings, end=None):
     """
     compute a position for a list of strings
     The string can only contain "0", "K", "W", "C".
     The number of "K" and "C" is the x coordinate, and the center of mass of the string is the y coordinate.
     """
     if isinstance(strings, str):
-        return letter_code_pos(strings)
+        return letter_code_pos(strings[:end:])
     elif isinstance(strings, list):
-        coord = np.array([letter_code_pos(s) for s in strings])
+        coord = np.array([letter_code_pos(s[:end:]) for s in strings])
         x = np.mean(coord[:, 0])
         y = np.mean(coord[:, 1])
         return x, y
