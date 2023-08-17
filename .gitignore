@@ -6,3 +6,5 @@
 # mdanalysis index file
 *.lock
 *.npz
+
+.ipynb_checkpoints
