@@ -338,7 +338,7 @@ if __name__ == "__main__":
     parser.add_argument("-cylinderRad",
                         dest="cylRAD",
                         metavar="float",
-                        help="Radius of the cylinder in Å. Default 2.5",
+                        help="Radius of the cylinder in Å. Default 3.5",
                         type=float,
                         default=3.5)
     parser.add_argument("-S0_Rad",
@@ -356,7 +356,7 @@ if __name__ == "__main__":
     parser.add_argument("-S5_r_cutoff",
                         dest="s5_r_cutoff",
                         metavar="float",
-                        help="Radius cutoff of the S5 in Å. Default value is 8. You might see double occupation",
+                        help="Radius cutoff of the S5 in Å. Default value is 9.",
                         type=float,
                         default=9)
     parser.add_argument("-SF_seq",
