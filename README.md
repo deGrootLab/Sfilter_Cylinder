@@ -93,10 +93,10 @@ We provide a command line tool to run this counting. `count_cylinder.py`
 `Cylinder_output` You can use this to load the std_out of `count_cylinder.py`. This includes the ion occupancy.  
 `Perm_event_output` You can use this to load the POT_perm_event.out. This includes the permeation event.
 
-### 3.4
+### 3.4. Analyze SF state distribution
 `analyse_distribution.py` is provided to do further analysis on the std_out from `count_cylinder.py`. It can compute the proportion of each state and estimate the error using bootstrap.
 
-### 3.5
+### 3.5. MD on toy model
 `Langevin` module provides funtion for running Langevin dynamics. You can provide you own topology. See `tutorial/02-Langevin-dynamic.ipynb`.
 
 ### 3.6. MSM mechanism analysis
