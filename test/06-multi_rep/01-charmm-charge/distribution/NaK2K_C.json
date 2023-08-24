@@ -1,0 +1,32 @@
+[
+    {
+        "files":
+        [
+            "../05-C_0.80/07-150MV/00/analysis/08-02-1.8A/k_cylinder.log",
+            "../05-C_0.80/07-150MV/01/analysis/08-02-1.8A/k_cylinder.log",
+            "../05-C_0.80/07-150MV/02/analysis/08-02-1.8A/k_cylinder.log"
+        ],
+        "end_frame":25000,
+        "step":1
+    },
+    {
+        "files":
+        [
+            "../06-C_0.75/07-1ps/00/analysis/08-02-1.8A/k_cylinder.log",
+            "../06-C_0.75/07-1ps/01/analysis/08-02-1.8A/k_cylinder.log",
+            "../06-C_0.75/07-1ps/02/analysis/08-02-1.8A/k_cylinder.log"
+        ],
+        "end_frame":500000,
+        "step":20
+    },
+    {
+        "files":
+        [
+            "../07-C_0.70/07-1ps/00/analysis/08-02-1.8A/k_cylinder.log",
+            "../07-C_0.70/07-1ps/01/analysis/08-02-1.8A/k_cylinder.log",
+            "../07-C_0.70/07-1ps/02/analysis/08-02-1.8A/k_cylinder.log"
+        ],
+        "end_frame":500000,
+        "step":20
+    }
+]
