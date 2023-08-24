@@ -8,6 +8,11 @@
 *.npz
 
 .ipynb_checkpoints
+
+/test/03-longest_common_sequence/02-cylinder/match.out
+
 /test/06-multi_rep/01-charmm-charge/05-C_0.80/
 /test/06-multi_rep/01-charmm-charge/06-C_0.75/
 /test/06-multi_rep/01-charmm-charge/07-C_0.70/
+/test/05-HRE/01-charmm-charge/distribution/*output.csv*
+/test/06-multi_rep/01-charmm-charge/distribution/*output.csv*
