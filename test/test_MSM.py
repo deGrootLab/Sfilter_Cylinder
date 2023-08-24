@@ -222,7 +222,9 @@ class MyTestCase(unittest.TestCase):
         msm = MSM.SF_msm(file_list)
         msm.calc_state_array()
         mfpt_01 = msm.get_MFPT_pair(0, 1)
-        MFPT_matrix, FPT_list = msm.get_MFPT_matrix()
+        MFPT_matrix, FPT_list1 = msm.get_MFPT_matrix()
+        rate, FPT_list2 = msm.get_nfp_rate_matrix()
+        self.assertListEqual(FPT_list1, FPT_list2)
 
     # plot
     def test_computer_pos(self):
