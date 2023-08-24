@@ -97,7 +97,7 @@ We provide a command line tool to run this counting. `count_cylinder.py`
 `analyse_distribution.py` is provided to do further analysis on the std_out from `count_cylinder.py`. It can compute the proportion of each state and estimate the error using bootstrap.
 
 ### 3.5
-`Langevin` module provides funtion for running Langevin dynamics. You can provide you own topology. See 'tutorial/02-Langevin-dynamic.ipynb'
+`Langevin` module provides funtion for running Langevin dynamics. You can provide you own topology. See `tutorial/02-Langevin-dynamic.ipynb`.
 
 ### 3.6. MSM mechanism analysis
 Mechanism analysis, Under development.  
