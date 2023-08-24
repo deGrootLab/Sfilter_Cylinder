@@ -313,7 +313,7 @@ class SF_msm:
 
     def get_MFPT_pair(self, A, B):
         """
-        compute mean first passage time from state A to state B
+        giving a pair of nodes, return the first-passage time from state A to state B
         A -> B
         alg1:
         B A-A C A-A C-C-C B-B
@@ -321,17 +321,48 @@ class SF_msm:
         :param A: int, node A
         :param B: int, node B
         :return:
-            MFPT_list, a list of FPT from state A to state B, unit in step
+            FPT_list, a list of FPT from state A to state B, unit in step
         """
-        MFPT_list = []
+        FPT_list = []
         for traj in self.state_array:
-            MFPT_list += MFPT_A_to_B(traj, A, B)
-        return MFPT_list
+            FPT_list += MFPT_A_to_B(traj, A, B)
+        return FPT_list
+
+    def get_nfp_rate_pair(self, A, B):
+        """
+        giving a pair of nodes, return the nfp_rate from state A to state B
+        The nft_rate(A -> B) is defined as this:
+        nfp_rate = number of first passage / occurring time of state A
+        :param A: int, node A
+        :param B: int, node B
+        :return:
+            nfp_rate : float, the nfp_rate from state A to state B
+            FPT_list : list of float, the first passage time from state A to state B, unit in time
+        """
+        FPT_list = self.get_MFPT_pair(A, B)
+        nfp_rate = len(FPT_list) / (self.node_counter[A] * self.time_step[0])
+        return nfp_rate, FPT_list
+
+    def get_mfpt_rate_pair(self, A, B):
+        """
+        giving a pair of nodes, return the mfpt_rate from state A to state B
+        The mfpt_rate(A -> B) is defined as this: 1/(mean first passage time)
+        :param A: int, node A
+        :param B: int, node B
+        :return:
+            mfpt_rate : float, the mfpt_rate from state A to state B
+            FPT_list : list of float, the first passage time from state A to state B, unit in time
+        """
+        FPT_list = self.get_MFPT_pair(A, B)
+        if len(FPT_list) == 0:
+            mfpt_rate = 0
+        else:
+            mfpt_rate = 1 / (np.mean(FPT_list) * self.time_step[0])
+        return mfpt_rate, FPT_list
 
     def get_MFPT_matrix(self, population_cutoff=0.01):
         """
         compute mean first passage time for every node pairs above population_cutoff
-        Multiple algorithms are available,
         A -> C
         alg1:
         C A-A B A-A B-B-B C-C
@@ -344,14 +375,18 @@ class SF_msm:
         """
         # find the node that is above the cutoff
         total_count = self.node_counter.total()
+        finish_flag = True
         for n, node_count in self.node_counter.items():
             if node_count / total_count < population_cutoff:
+                finish_flag = False
                 break
+        if finish_flag:
+            n += 1
         MFPT_matrix = np.zeros((n, n), dtype=np.float64)
         FPT_list = []
         for i in range(n):
             FPT_list.append([])
-            for j in range(n):
+            for j in range(n):  # i -> j
                 if i == j:
                     fpt_ij = []
                     FPT_list[i].append(fpt_ij)
@@ -363,6 +398,37 @@ class SF_msm:
                     else:
                         MFPT_matrix[i, j] = np.mean(fpt_ij) * self.time_step[0]
         return MFPT_matrix, FPT_list
+
+    def get_nfp_rate_matrix(self, population_cutoff=0.01):
+        """
+        compute the nfp_rate for every node pairs above population_cutoff
+        :param population_cutoff:
+        :return:
+            nfp_rate_matrix: a numpy array, each element is the rate from state i to state j, unit in step*physical_time_step,
+                         If no transition found, 0 is used
+            FPT_list, each element is a list of FPT from state i to state j, unit in step
+        """
+        # find the node that is above the cutoff
+        total_count = self.node_counter.total()
+        finish_flag = True
+        for n, node_count in self.node_counter.items():
+            if node_count / total_count < population_cutoff:
+                finish_flag = False
+                break
+        if finish_flag:
+            n += 1
+        rate_matrix = np.zeros((n, n), dtype=np.float64)
+        FPT_list = []
+        for i in range(n):
+            FPT_list.append([])
+            for j in range(n):  # i -> j
+                if i == j:
+                    rate_matrix[i, j] = 0
+                    FPT_list[i].append([])
+                else:
+                    rate_matrix[i, j], fpt_ij = self.get_nfp_rate_pair(i, j)
+                    FPT_list[i].append(fpt_ij)
+        return rate_matrix, FPT_list
 
     def get_matrix(self, lag_step=1, physical_time=None):
         """
