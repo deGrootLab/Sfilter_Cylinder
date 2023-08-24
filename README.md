@@ -26,7 +26,7 @@ python -m ipykernel install --user --name Name_of_ipykernel
 cd XXX/Sfilter_Cylinder
 git pull
 conda activate Name_of_Env
-pip install .         
+pip install .         # this will remove the old version and reinstall the new version
 count_cylinder.py -h  # check version
 ```
 
@@ -37,9 +37,12 @@ jupyter kernelspec uninstall unwanted-kernel  # replace this with the name of yo
 conda remove -n Name_of_Env --all  # You need to deactivate the env before this removing
 ```
 
-## How to use it ?
+## 2. How to use it ?
+### 2.1 Analyze the xtc trajectory and count permeation.
 ```bash
-cd test/01-NaK2K/1-Charmm/with_water
+cd test
+base=$PWD
+cd $base/01-NaK2K/1-Charmm/with_water
 count_cylinder.py -pdb ../em.gro \
   -xtc fix_atom_c_100ps.xtc -K POT \
   -SF_seq THR VAL GLY TYR GLY > k_cylinder.out
@@ -55,8 +58,8 @@ count_cylinder.py -pdb em_dry.gro \
   -xtc fix_atom_c_100ps_dry.xtc -K K \
   -SF_seq THR VAL GLY TYR GLY > k_cylinder.out
   # There are two permeation events in this example
-  
-cd ../../../03-longest_common_sequence/
+
+cd $base/03-longest_common_sequence/
 match_xtck.py \
   -cylinderS 03-state-code/POT_perm_event.out \
   -perm_up 01-xtck/perm_up.dat \
@@ -64,21 +67,37 @@ match_xtck.py \
   # match result with xtck
 ```
 The potassium permeation will be saved in `POT_perm_event.out`. Please take a look at the resident time. 
-this is the time that the atom stays in the cylinder. This time should be safely smaller than the trajectory 
-time step. 
+this is the time that the atom stays in the cylinder. This time should be safely smaller than the trajectory time step. 
 
-## 2.What can it do?
-### 2.1. Count ion permeation  
+### 2.2 Analyze the SF state distribution
+```bash
+cd $base/05-HRE/01-charmm-charge/distribution/
+analyse_distribution.py -i NaK2K_C_HRE.json
+# analysi the distribution of SF state
+
+cd $base/06-multi_rep/01-charmm-charge/distribution
+cat NaK2K_C.json
+# file too large
+```
+
+## 3.What can it do?
+### 3.1. Count ion permeation  
 ![permeation](ion-counting.jpg "permeation definition")
 Ion permeation is defined by sequentially passing though 4,1,3 compartment.  
 We provide a command line tool to run this counting. `count_cylinder.py`    
 
-### 2.2. Track binding site occupancy state
+### 3.2. Track binding site occupancy state
 `count_cylinder.py` will print what atom (index) is in each binding site.  
 
-### 2.3. Two output wrapper are provided
+### 3.3. Two output wrapper are provided
 `Cylinder_output` You can use this to load the std_out of `count_cylinder.py`. This includes the ion occupancy.  
 `Perm_event_output` You can use this to load the POT_perm_event.out. This includes the permeation event.
 
-### 2.4. MSM mechanism analysis
-Under development.  
+### 3.4
+`analyse_distribution.py` is provided to do further analysis on the std_out from `count_cylinder.py`. It can compute the proportion of each state and estimate the error using bootstrap.
+
+### 3.5
+`Langevin` module provides funtion for running Langevin dynamics. You can provide you own topology. See 'tutorial/02-Langevin-dynamic.ipynb'
+
+### 3.6. MSM mechanism analysis
+Mechanism analysis, Under development.  
