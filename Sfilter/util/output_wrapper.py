@@ -341,10 +341,7 @@ class Cylinder_output:
         self.meta_data = []
         data_list = []
         for f in self.files:
-            try:
-                data_list.append(read_k_cylinder(f, method))
-            except:
-                raise ValueError(f, "\nThere is problem in this file")
+            data_list.append(read_k_cylinder(f, method))
         for s_list, meta_data, K_occupency, W_occupency in [read_k_cylinder(f, method) for f in self.files]:
             self.state_str.append(s_list[start:end:step])
             if time_step is None:
