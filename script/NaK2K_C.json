@@ -1,0 +1,29 @@
+[
+    {
+        "files":
+        [
+            "../test/06-multi_rep/01-charmm-charge/05-C_0.80/07-150MV/00/analysis/08-02-1.8A/k_cylinder.log",
+            "../test/06-multi_rep/01-charmm-charge/05-C_0.80/07-150MV/01/analysis/08-02-1.8A/k_cylinder.log"
+        ],
+        "end_frame":25000,
+        "step":1
+    },
+    {
+        "files":
+        [
+            "../test/06-multi_rep/01-charmm-charge/06-C_0.75/07-1ps/00/analysis/08-02-1.8A/k_cylinder.log",
+            "../test/06-multi_rep/01-charmm-charge/06-C_0.75/07-1ps/01/analysis/08-02-1.8A/k_cylinder.log"
+        ],
+        "end_frame":500000,
+        "step":20
+    },
+    {
+        "files":
+        [
+            "../test/06-multi_rep/01-charmm-charge/07-C_0.70/07-1ps/00/analysis/08-02-1.8A/k_cylinder.log",
+            "../test/06-multi_rep/01-charmm-charge/07-C_0.70/07-1ps/01/analysis/08-02-1.8A/k_cylinder.log"
+        ],
+        "end_frame":500000,
+        "step":20
+    }
+]
