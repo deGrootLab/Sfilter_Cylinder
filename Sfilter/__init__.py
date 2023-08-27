@@ -5,4 +5,4 @@ from .util.output_wrapper import read_k_cylinder
 from .util import MSM
 from .util import Langevin
 
-__version__ = '0.6.0'
+__version__ = '0.6.1_dev'
