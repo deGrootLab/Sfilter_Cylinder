@@ -233,6 +233,7 @@ def update_event_count_dict(event_count_dict, ts, sf, atom_selection_dict,
 def get_closest_water(center_selection, water_O_selection, n_water, distance_array):
     """
     Input the center selection and water oxygen selection, return the closest n water molecules.
+    mdanalysis should automatically detect OMP_NUM_THREADS and use all the threads.
     :param center_selection: MDAnalysis selection for the center.
         We only measure the distance from the center of this selection.
     :param water_O_selection: MDAnalysis selection for the water oxygen atoms.
@@ -244,7 +245,7 @@ def get_closest_water(center_selection, water_O_selection, n_water, distance_arr
     """
     center = center_selection.center_of_geometry()
     dist_matrix = distances.distance_array(center, water_O_selection.positions,
-                                           box=water_O_selection.dimensions, result=distance_array)
+                                           box=water_O_selection.dimensions, result=distance_array, backend="OpenMP" )
     closest_indices = dist_matrix.argsort()[:, :n_water]
     closest_indices = closest_indices.reshape(-1)
     closest_indices.sort()
