@@ -6,8 +6,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from .output_wrapper import read_k_cylinder
 import pyemma
-
-
+from scipy.optimize import minimize
 
 
 def matrix_to_df(matrix, msm, cut_off=0.01):
@@ -81,8 +80,6 @@ def MFPT_A_to_B(traj, A, B):
             return MFPT_list
 
 
-
-
 class SF_msm:
     def __init__(self, file_list, start=0, end=None, step=1, method="K_priority"):
         """
@@ -150,7 +147,6 @@ class SF_msm:
             self.int_2_s[int(i)] = [i]
             self.s_2_int[i] = int(i)
 
-
     def calc_state_array(self, merge_list=None):
         """
         convert state_str to state_array
@@ -211,7 +207,7 @@ class SF_msm:
         """""
         state_num = max([max(traj) for traj in self.state_array])
         f_matrix = np.zeros((state_num + 1, state_num + 1), dtype=np.int64)
-        #for traj in self.state_array:
+        # for traj in self.state_array:
         #    state_start = traj[:-lag_step]
         #    state_end = traj[lag_step:]
         #    for m_step in np.array([state_start, state_end]).T:
@@ -295,7 +291,7 @@ class SF_msm:
         reality.append(p_matrix_0)
         prediction.append(p_matrix_0)
         for t in test_time:
-            reality.append(self.get_transition_probability(t*lag_step))
+            reality.append(self.get_transition_probability(t * lag_step))
             prediction.append(np.linalg.matrix_power(p_matrix_0, t))
         return np.array(reality), np.array(prediction)
 
@@ -309,7 +305,6 @@ class SF_msm:
     #     :return:
     #     """
     #     pass
-
 
     def get_MFPT_pair(self, A, B):
         """
@@ -360,6 +355,23 @@ class SF_msm:
             mfpt_rate = 1 / (np.mean(FPT_list) * self.time_step[0])
         return mfpt_rate, FPT_list
 
+    def population_cutoff(self, population_cutoff=0.01):
+        """
+        find the node that is above the cutoff.
+        All the node in range(n) is above the cutoff.
+        :param population_cutoff:
+        :return: n, the number of nodes that is above the cutoff
+        """
+        total_count = self.node_counter.total()
+        finish_flag = True
+        for n, node_count in self.node_counter.items():
+            if node_count / total_count < population_cutoff:
+                finish_flag = False
+                break
+        if finish_flag:
+            n += 1
+        return n
+
     def get_MFPT_matrix(self, population_cutoff=0.01):
         """
         compute mean first passage time for every node pairs above population_cutoff
@@ -373,15 +385,8 @@ class SF_msm:
                          If no transition found, np.inf is used
             FPT_list, each element is a list of FPT from state i to state j, unit in step
         """
-        # find the node that is above the cutoff
-        total_count = self.node_counter.total()
-        finish_flag = True
-        for n, node_count in self.node_counter.items():
-            if node_count / total_count < population_cutoff:
-                finish_flag = False
-                break
-        if finish_flag:
-            n += 1
+        # find the node that is above the cutoff, if all nodes are above the cutoff, n = N+1
+        n = self.population_cutoff(population_cutoff)
         MFPT_matrix = np.zeros((n, n), dtype=np.float64)
         FPT_list = []
         for i in range(n):
@@ -409,14 +414,7 @@ class SF_msm:
             FPT_list, each element is a list of FPT from state i to state j, unit in step
         """
         # find the node that is above the cutoff
-        total_count = self.node_counter.total()
-        finish_flag = True
-        for n, node_count in self.node_counter.items():
-            if node_count / total_count < population_cutoff:
-                finish_flag = False
-                break
-        if finish_flag:
-            n += 1
+        n = self.population_cutoff(population_cutoff)
         rate_matrix = np.zeros((n, n), dtype=np.float64)
         FPT_list = []
         for i in range(n):
@@ -469,114 +467,10 @@ class SF_msm:
                     time_count = 1
         return res_time
 
-    def find_merge_states(self, cut_off=0.01, lag_step=1, physical_time=None, method="rate_square"):
-        """
-        rank states pairs with ( (rate_ij + rate_ji) * (T_ij + T_ji) )
-        input:
-            cut_off: the cut-off of the distribution of states, states with occurrence less than cut_off will be ignored
-            lag_step: lag time in step
-            physical_time: physical time for each step, if not given, use the time_step that was read from file
-        return: f_list, (t_matrix, net_t_matrix, rate_matrix, p_matrix), node_num
-            f_list: a list of [state_i, state_j, object_function]
-            matrices: (t_matrix, net_t_matrix, rate_matrix, p_matrix)
-            node_num: the final states with occurrence larger than cut_off
-        """
-        if physical_time is None:  # use the time_step that was read from file
-            if np.allclose(self.time_step, self.time_step[0]):
-                physical_time = self.time_step[0] * lag_step
-            else:
-                raise ValueError("physical_time is not given, and time_step is not equal")
-
-        t_matrix, net_t_matrix, rate_matrix, p_matrix = self.get_matrix(lag_step=lag_step, physical_time=physical_time)
-        for node_num in range(len(self.int_2_s)):
-            if self.distribution[node_num] <= cut_off:
-                node_num -= 1
-                break
-                # node_num: the final states with occurrence larger than cut_off
-        f_list = []
-        if method == "rate_T":
-            for i in range(node_num + 1):
-                for j in range(i):
-                    f_list.append([j, i,
-                                   (rate_matrix[i, j] + rate_matrix[j, i])
-                                   * (t_matrix[i, j] + t_matrix[j, i])])
-        elif method == "rate":
-            for i in range(node_num + 1):
-                for j in range(i):
-                    f_list.append([j, i,
-                                   (rate_matrix[i, j] + rate_matrix[j, i])])
-        elif method == "rate_square":
-            for i in range(node_num + 1):
-                for j in range(i):
-                    f_list.append([j, i,
-                                   (rate_matrix[i, j] * rate_matrix[j, i])])
-        elif method == "rate_triangle":
-            for i in range(node_num + 1):
-                for j in range(i):
-                    if rate_matrix[i, j] * rate_matrix[j, i] == 0:
-                        f_list.append([j, i, 0])
-                    else:
-                        f_list.append([j, i,
-                                       rate_matrix[i, j] * rate_matrix[j, i]
-                                       * min(rate_matrix[i, j], rate_matrix[j, i])
-                                       / max(rate_matrix[i, j], rate_matrix[j, i])
-                                       ])
-        else:
-            raise ValueError("method must be rate_T, rate, or rate_square")
-        f_list = sorted(f_list, key=lambda x: x[2], reverse=True)
-        return f_list, (t_matrix, net_t_matrix, rate_matrix, p_matrix), node_num
-
-
-    def lump_MFPT(self, node_cut_off=0.01, min_node=3):
-        """
-        Run one step of Lumping according to MFPT (as the inversed rate)
-        :param min_node:
-        :return:
-        """
-        total_count = self.node_counter.total()
-        for n, node_count in self.node_counter.items():
-            if node_count / total_count < node_cut_off:
-                break
-        # check node number
-        if n < min_node:
-            return False, copy.deepcopy(self.merge_list), [0,0]
-        # get MFPT
-        MFPT_matrix, FPT_list = self.get_MFPT_matrix(node_cut_off)
-        MFPT_matrix_sqare = MFPT_matrix * MFPT_matrix.T
-        mfpt_list = []
-        for i in range(len(MFPT_matrix_sqare)):
-            for j in range(0, i):
-                mfpt_list.append([i, j, MFPT_matrix_sqare[i, j]])
-        mfpt_list = sorted(mfpt_list, key=lambda x: x[2])
-        n_0, n_1, mfpt = mfpt_list[0]
-        if len(self.int_2_s[n_0]) > 1 and len(self.int_2_s[n_1]) > 1:
-            merge_list_new = copy.deepcopy(self.merge_list)
-            for node in self.merge_list:
-                for node2 in self.merge_list:
-                    if node == self.int_2_s[n_0] and node2 == self.int_2_s[n_1]:
-                        merge_list_new.remove(node)
-                        merge_list_new.remove(node2)
-                        merge_list_new.append(node + node2)
-        elif len(self.int_2_s[n_0]) > 1 or len(self.int_2_s[n_1]) > 1:
-            merge_list_new = []
-            for node in self.merge_list:
-                if node == self.int_2_s[n_0]:
-                    merge_list_new.append(node + self.int_2_s[n_1])
-                elif node == self.int_2_s[n_1]:
-                    merge_list_new.append(self.int_2_s[n_0] + node)
-                else:
-                    merge_list_new.append(node)
-        elif len(self.int_2_s[n_0]) == 1 or len(self.int_2_s[n_1]) == 1:
-            merge_list_new = copy.deepcopy(self.merge_list)
-            merge_list_new.append(self.int_2_s[n_0] + self.int_2_s[n_1])
-        else:
-            raise ValueError("merge error " + str(n_0) + str(n_1))
-        return True, merge_list_new, [self.int_2_s[n_0], self.int_2_s[n_1]]
-
     def get_pyemma_TPT_rate(self):
         rate_matrix = np.zeros((len(self.int_2_s), len(self.int_2_s)))
         msm = pyemma.msm.estimate_markov_model(self.state_array, lag=1,
-                                               reversible=False, dt_traj=str(self.time_step[0])+" ps")
+                                               reversible=False, dt_traj=str(self.time_step[0]) + " ps")
         for i in range(len(self.int_2_s)):
             for j in range(len(self.int_2_s)):
                 if i != j:
@@ -584,141 +478,6 @@ class SF_msm:
                 else:
                     rate_matrix[i, j] = 0
         return rate_matrix
-
-
-    def lump_pyemma_TPT_rate(self, node_cut_off=0.01, min_node=3):
-        total_count = self.node_counter.total()
-        for n, node_count in self.node_counter.items():
-            if node_count / total_count < node_cut_off:
-                break
-        # check node number
-        if n < min_node:
-            return False, copy.deepcopy(self.merge_list), [0, 0]
-        # get rate matrix using pyemma TPT
-        msm_pyemma = pyemma.msm.estimate_markov_model(self.state_array, lag=1,
-                                                      reversible=False, dt_traj=str(self.time_step[0])+" ps")
-        rate_matrix = np.zeros((n, n))
-        for i in range(n):
-            for j in range(n):
-                if i != j:
-                    rate_matrix[i, j] = pyemma.msm.tpt(msm_pyemma, [i], [j]).rate
-                else:
-                    rate_matrix[i, j] = 0
-        rate_list = []
-        for i in range(n):
-            for j in range(0, i):
-                rate_list.append([i, j, rate_matrix[i, j] * rate_matrix[j, i]])
-        rate_list = sorted(rate_list, key=lambda x: x[2], reverse=True)
-        n_0, n_1, rate = rate_list[0]
-        if len(self.int_2_s[n_0]) > 1 and len(self.int_2_s[n_1]) > 1:
-            merge_list_new = copy.deepcopy(self.merge_list)
-            for node in self.merge_list:
-                for node2 in self.merge_list:
-                    if node == self.int_2_s[n_0] and node2 == self.int_2_s[n_1]:
-                        merge_list_new.remove(node)
-                        merge_list_new.remove(node2)
-                        merge_list_new.append(node + node2)
-        elif len(self.int_2_s[n_0]) > 1 or len(self.int_2_s[n_1]) > 1:
-            merge_list_new = []
-            for node in self.merge_list:
-                if node == self.int_2_s[n_0]:
-                    merge_list_new.append(node + self.int_2_s[n_1])
-                elif node == self.int_2_s[n_1]:
-                    merge_list_new.append(self.int_2_s[n_0] + node)
-                else:
-                    merge_list_new.append(node)
-        elif len(self.int_2_s[n_0]) == 1 or len(self.int_2_s[n_1]) == 1:
-            merge_list_new = copy.deepcopy(self.merge_list)
-            merge_list_new.append(self.int_2_s[n_0] + self.int_2_s[n_1])
-        else:
-            raise ValueError("merge error " + str(n_0) + str(n_1))
-        return True, merge_list_new, [self.int_2_s[n_0], self.int_2_s[n_1]]
-
-
-
-    def merge_until(self, rate_cut_off, rate_square_cut_off, node_cut_off=0.01, step_cut_off=30, lag_step=1, physical_time=None,
-                    method="rate_square", min_node=3):
-        """
-        Merge states until a certain cutoff
-        I suggest to set rate_cut_off as 0.5/physical_time or smaller
-        input:
-            rate_cut_off: the maximum rate of the merged states
-            rate_square_cut_off: the maximum rate_square of the merged states
-                only when both rate and rate_square are smaller than the cut_off iteration will stop
-            node_cut_off: Nodes with occurrence less than cut_off will be ignored.
-            lag_step: The number of steps that is used to calculate all matrix
-            physical_time: physical time for each step, if not given, use the time_step that was read from file
-            method: "rate_T", "rate", or "rate_square"
-                rate_square is recommended
-            min_node: the minimum number of nodes that will stop iteration.
-        """
-        if physical_time is None:  # use the time_step that was read from file
-            if np.allclose(self.time_step, self.time_step[0]):
-                physical_time = self.time_step[0]
-            else:
-                raise ValueError("physical_time is not given, and time_step is not equal")
-
-        merge_step = 0
-        print(" Step,    rate^2,      rate,  rate_tri,")
-        while True:
-            # get state pairs with the largest (rate_ij + rate_ji) * (T_ij + T_ji)
-            m_list, (t_mat, net_t_mat, rate_mat, p_mat), node_num = self.find_merge_states(
-                cut_off=node_cut_off,
-                lag_step=lag_step,
-                physical_time=physical_time,
-                method=method)
-
-            # check convergence
-            if node_num + 1 <= min_node:
-                reason = "minimum node reached"
-                break
-            n_0, n_1, _ = m_list[0]
-            r_square = rate_mat[n_0, n_1] * rate_mat[n_1, n_0]
-            max_rate = np.max(rate_mat[:node_num + 1, :node_num + 1])
-            if max_rate < rate_cut_off and r_square < rate_square_cut_off:
-                reason = "rate and rate^2 cut off reached"
-                break
-            if len(m_list) == 1:
-                reason = "no more merging"
-                break
-            if merge_step > step_cut_off:
-                reason = "step cut off reached"
-                break
-            # merge states
-            # n_0, n_1, _ = m_list[0]
-            merge_step += 1
-            rate_triangle = rate_mat[n_0, n_1] * rate_mat[n_1, n_0] * min(rate_mat[n_0, n_1], rate_mat[n_1, n_0]) \
-                            / max(rate_mat[n_0, n_1], rate_mat[n_1, n_0])
-            print(f"{merge_step:5d}, {r_square:9.5f}, {max_rate:9.4f}, {rate_triangle:9.4f}, {self.int_2_s[n_0]}+{self.int_2_s[n_1]}")
-            if len(self.int_2_s[n_0]) > 1 and len(self.int_2_s[n_1]) > 1:
-                merge_list_new = copy.deepcopy(self.merge_list)
-                for node in self.merge_list:
-                    for node2 in self.merge_list:
-                        if node == self.int_2_s[n_0] and node2 == self.int_2_s[n_1]:
-                            merge_list_new.remove(node)
-                            merge_list_new.remove(node2)
-                            merge_list_new.append(node + node2)
-                self.merge_list = merge_list_new
-            elif len(self.int_2_s[n_0]) > 1 or len(self.int_2_s[n_1]) > 1:
-                merge_list_new = []
-                for node in self.merge_list:
-                    if node == self.int_2_s[n_0]:
-                        merge_list_new.append(node + self.int_2_s[n_1])
-                    elif node == self.int_2_s[n_1]:
-                        merge_list_new.append(self.int_2_s[n_0] + node)
-                    else:
-                        merge_list_new.append(node)
-                self.merge_list = merge_list_new
-            elif len(self.int_2_s[n_0]) == 1 or len(self.int_2_s[n_1]) == 1:
-                self.merge_list.append(self.int_2_s[n_0] + self.int_2_s[n_1])
-            else:
-                raise ValueError("merge error " + str(n_0) + str(n_1))
-            self.calc_state_array(merge_list=self.merge_list)
-        print("#" * 60)
-        print(f"Converged")
-        print(f"  Maximum r^2  : {r_square:.3f}")
-        print(f"  Maximum rate : {max_rate:.3f}")
-        return reason
 
 
 def states_2_name(node, index=None):
@@ -749,9 +508,7 @@ def plot_net_T_matrix(ax, msm, cut_off, edge_cutoff, net_t_matrix, iterations, k
     """
     G = nx.DiGraph()
     # cutoff at certain density
-    for node_num in range(len(msm.int_2_s)):
-        if msm.distribution[node_num] < cut_off:
-            break
+    node_num = msm.population_cutoff(cut_off)
 
     # prepare node with name and color
     node_colors = []
@@ -838,5 +595,331 @@ def computer_pos(strings, end=None):
         return x, y
 
 
+class Graph:
+    def __init__(self, model: SF_msm):
+        """
+        :param model: Sfilter.MSM.SF_msm
+        This is the class to plot the mechanism graph.
+        """
+        self.model = model
+        self.G = None
+        self.population_cutoff = None
+        self.node_color = "#1f78b4"
+
+    def set_node_from_population(self, population_cutoff=0.01):
+        """
+        set the node based on population.
+        This function will reset the self.G and add nodes which has the population above population_cutoff.
+        :param population_cutoff: float
+        :return: None
+        """
+        self.G = nx.DiGraph()
+        n = self.model.population_cutoff(population_cutoff)
+        for i in range(n):
+            self.G.add_node(i)
+        self.population_cutoff = population_cutoff
+
+    def sef_node_color(self, color_list=None):
+        """
+        set the color of nodes.
+        :param color_list: a list of color for each node
+        :return: None
+        """
+        if color_list is None:
+            # set node color based on the number of K and C, and use matplotlib default color cycle
+            color_list = []
+            for node in self.G.nodes:
+                K_number = self.model.int_2_s[node][0][:5].count("K") + self.model.int_2_s[node][0][:5].count("C")
+                K_number = (K_number + 8) % 10
+                color_list.append(plt.rcParams['axes.prop_cycle'].by_key()['color'][K_number])
+        if len(color_list) != len(self.G.nodes):
+            raise ValueError("color_list must have the same length as the number of nodes")
+        self.node_color = color_list
+
+    def set_node_size(self, size_dict=None):
+        """
+        set the size of nodes. If size_dict is None, use the population of each state as the size.
+        :param size_dict: a dictionary from node index to size
+        :return: None
+        """
+        total = self.model.node_counter.total()
+        if size_dict is None:
+            size_dict = {i: self.model.node_counter[i] / total * 100 for i in self.G.nodes}
+        nx.set_node_attributes(self.G, size_dict, "size")
+
+    def set_node_label(self, label_function=None, **kwargs):
+        """
+        set the label of nodes.
+        if you do it twice, all of the labels will be overwritten.
+        :param label_function: a function to convert node (a list of 6-letter code) to label.
+            if label_function is None, use the default function,
+            x will be the number of K or C, and y will be the center of mass for S0-S4.
+        :return:
+        """
+        if label_function is None:
+            def label_function(i, add_index=True):
+                node = self.model.int_2_s[i]
+                if not add_index:
+                    string = ""
+                elif len(node) <= 1:
+                    string = f"{i}:"
+                else:
+                    string = f"{i} : \n"
+
+                for s in node[:-1]:
+                    string += s
+                    string += "\n"
+                string += node[-1]
+                return string
+        label_dict = {i: label_function(i, **kwargs) for i in self.G.nodes}
+        nx.set_node_attributes(self.G, label_dict, "label")
+
+    def add_weighted_edges_from_net_F(self, cut_off, net_F=None):
+        """
+        set the edge based on net flux.
+        Net flux above cut_off will be added.
+        :param cut_off: Net flux cutoff
+        :param net_F: net flux matrix, if not given, will recalculate from model.get_matrix()
+        :return: None
+        """
+        if cut_off < 0:
+            raise ValueError("cut_off must be positive")
+
+        if net_F is None:
+            f_matrix, net_F, r_matrix, p_matrix = self.model.get_matrix()
+        for i in self.G.nodes:
+            for j in self.G.nodes:
+                if i > j:
+                    if net_F[i, j] > net_F[j, i] and net_F[i, j] > cut_off:
+                        self.G.add_edge(i, j, weight=self.model.net_t_matrix[i, j])
+                    elif net_F[i, j] <= net_F[j, i] and net_F[j, i] > cut_off:
+                        self.G.add_edge(j, i, weight=self.model.net_t_matrix[j, i])
+
+    def add_weighted_edges_from_rate_nfp(self, cut_off, rate_matrix=None):
+        """
+        set the edge based on the rate (number of first passage / observation time).
+        Rate above cut_off will be added.
+        :param cut_off: Rate cutoff
+        :param rate_matrix: rate matrix, if not given, will recalculate from model.get_nfp_rate_matrix()
+        :return: None
+        """
+
+        if rate_matrix is None:
+            rate_matrix, FP_list = self.model.get_nfp_rate_matrix(population_cutoff=self.population_cutoff)
+        for i in self.G.nodes:
+            for j in self.G.nodes:
+                if i > j:
+                    if rate_matrix[i, j] > rate_matrix[j, i] and rate_matrix[i, j] > cut_off:
+                        self.G.add_edge(i, j, weight=rate_matrix[i, j])
+                    elif rate_matrix[i, j] <= rate_matrix[j, i] and rate_matrix[j, i] > cut_off:
+                        self.G.add_edge(j, i, weight=rate_matrix[j, i])
+
+    def add_weighted_edges_from_rate_nfp_netF(self, rate_cut_off, net_F_cut_off=0, rate_matrix=None, net_F=None,
+                                              label_format="{:d}"):
+        """
+        Add edge based on rate and net flux.
+        if a positive net flux has a rate above rate_cut_off, add the edge.
+        The weight of the edge is the rate.
+        The label of the edge is the net flux.
+        If you do this twice, all of the edges will be overwritten.
+        :param rate_cut_off: minimum rate to add an edge
+        :param net_F_cut_off: minimum net flux to add an edge
+        :param rate_matrix: rate matrix, if not given, will recalculate from model.get_nfp_rate_matrix()
+        :param net_F: net flux matrix, if not given, will recalculate from model.get_matrix()
+        :param label_format: format of the label. default is "{:d}"
+        :return: None
+        """
+        if rate_matrix is None:
+            rate_matrix, FP_list = self.model.get_nfp_rate_matrix(population_cutoff=self.population_cutoff)
+        if net_F is None:
+            f_matrix, net_F, _r_matrix, p_matrix = self.model.get_matrix()
+        self.G.remove_edges_from(list(self.G.edges))
+        for i in self.G.nodes:
+            for j in self.G.nodes:
+                if i > j:
+                    if net_F[i, j] > net_F_cut_off and rate_matrix[i, j] > rate_cut_off:
+                        self.G.add_edge(i, j, weight=rate_matrix[i, j])
+                        self.G.edges[i, j]["label"] = label_format.format(net_F[i, j])
+                    elif net_F[j, i] > net_F_cut_off and rate_matrix[j, i] > rate_cut_off:
+                        self.G.add_edge(j, i, weight=rate_matrix[j, i])
+                        self.G.edges[j, i]["label"] = label_format.format(net_F[j, i])
+
+    def add_edge_label_from_net_F(self, net_F=None, label_format="{:.2e}"):
+        """
+        add label to existing edges based on net flux.
+        :return: None
+        """
+        if net_F is None:
+            f_matrix, net_F, r_matrix, p_matrix = self.model.get_matrix()
+        for i, j in self.G.edges:
+            # only modify the label
+            self.G.edges[i, j]["label"] = label_format.format(net_F[i, j])
+
+    def add_edge_label_from_rate_nfp(self, rate_matrix=None, label_format="{:.2e}"):
+        """
+        add label to existing edges based on rate.
+        :return: None
+        """
+        if rate_matrix is None:
+            rate_matrix, FP_list = self.model.get_nfp_rate_matrix(population_cutoff=self.population_cutoff)
+        for i, j in self.G.edges:
+            # only modify the label
+            self.G.edges[i, j]["label"] = label_format.format(rate_matrix[i, j])
+
+    def guess_init_position(self, str_2_xy=None):
+        """
+
+        :param str_2_xy: function, convert a string to a position, if not given, ??
+        :return: position, a dictionary from node index to position
+        """
+        if str_2_xy is None:
+            def str_2_xy(string):
+                weight_dict = {"K": 1,
+                               "W": 0.2,
+                               "C": 1.1,
+                               "0": 0, }
+                center_mass = 0  # y
+                total_mass = 0
+                for i, site in enumerate(string):
+                    center_mass += weight_dict[site] * i
+                    total_mass += weight_dict[site]
+                center_mass /= total_mass
+                x = string[:5].count("K") + string[:5].count("C")
+                return x, center_mass
+        position = {}
+        for i in self.G.nodes:
+            p_i = [str_2_xy(si) for si in self.model.int_2_s[i]]
+            p_i = np.mean(p_i, axis=0)
+            position[i] = p_i
+        return position
+
+    def draw_grid(self, ax, grid=0.1):
+        if grid:
+            xmin, xmax = ax.get_xlim()
+            ymin, ymax = ax.get_ylim()
+            # round to a multiple of f
+            xmin = np.ceil(xmin / grid) * grid
+            ymin = np.ceil(ymin / grid) * grid
+            ax.set_xticks(np.arange(xmin, xmax, grid))
+            ax.set_yticks(np.arange(ymin, ymax, grid))
+            ax.grid()
+
+    def draw_dirty(self, ax, node_size_factor=1.0, node_alpha=0.7, edge_alpha=0.5,
+                   spring_iterations=5, spring_k=10,
+                   edge_factor=None, pos=None,
+                   label_bbox=None):
+        """
+
+        :param ax: matplotlib.axes
+        :param node_size_factor: float, set it larger to make the node larger, default is 1.0
+        :param edge_factor: float, set it larger to make the edge wider, default is 0.1/min_weight,
+            which means the thinnest edge will be 0.1.
+        :param pos: position, a dictionary from node index to position.
+            If not given, use nx.spring_layout to guess the initial position.
+        :param label_bbox: a dictionary, the bbox for edge label
+        :return: position, a dictionary from node index to position
+        """
+        if label_bbox is None:
+            label_bbox = {"boxstyle": "round", "ec": (1.0, 1.0, 1.0, 0), "fc": (1.0, 1.0, 1.0, 0.5)}
+        if pos is None:
+            # guess the initial position and optimize
+            pos = nx.spring_layout(self.G, iterations=spring_iterations, k=spring_k, pos=self.guess_init_position())
+        if edge_factor is None:
+            edge_factor = 0.1 / min([self.G.edges[i, j]["weight"] for i, j in self.G.edges])
+
+        # draw nodes
+        node_sizes = [self.G.nodes[i]["size"] * 50 * node_size_factor for i in self.G.nodes]
+        nx.draw_networkx_nodes(self.G, ax=ax, pos=pos, node_size=node_sizes,
+                               node_color=self.node_color, alpha=node_alpha)
+        nx.draw_networkx_labels(self.G, ax=ax, pos=pos, labels=nx.get_node_attributes(self.G, "label"),
+                                font_family='monospace')
+
+        # draw edges
+        edge_width = [self.G.edges[i, j]["weight"] * edge_factor for i, j in self.G.edges]
+        nx.draw_networkx_edges(self.G, ax=ax, pos=pos, width=edge_width, connectionstyle='arc3,rad=0.05',
+                               alpha=edge_alpha, node_size=np.array(node_sizes) * 2.0)
+        nx.draw_networkx_edge_labels(self.G, pos, edge_labels=nx.get_edge_attributes(self.G, 'label'), ax=ax,
+                                     bbox=label_bbox)
+
+        return pos, edge_factor
+
+    def lj_potential(self, pos, sigma=0.2, epsilon=0.5):
+        """
+        compute the Lennard-Jones potential between every pair of nodes and edge.
+        :param pos: position, a dictionary from node index to position
+        :param sigma:
+        :param epsilon:
+        :return: energy, float
+        """
+        # Loop through all unique pairs of nodes/labels
+        energy = 0
+        position_list = []
+        for i in self.G.nodes:
+            position_list.append(np.array(pos[i]))
+        for i, j in self.G.edges:
+            position_list.append((np.array(pos[i]) + np.array(pos[j])) / 2)
+        for i, pos_i in enumerate(position_list):
+            for j, pos_j in enumerate(position_list):
+                if i > j:
+                    energy += lj_pair(pos_i, pos_j, sigma, epsilon)
+        return energy
+
+    def coulomb_potential(self, pos,  distance_cutoff=0.2):
+        """
+        compute the potential between every pair of nodes and edge.
+        E = 1/r**3
+        :param pos: position, a dictionary from node index to position
+        :param distance_cutoff: float, interaction outside this distance will not be considered
+        :return: energy, float
+        """
+        # Loop through all unique pairs of nodes/labels
+        energy = 0
+        position_list = []
+        cut_off_energy = 1 / (distance_cutoff)*3 / 1000
+        for i in self.G.nodes:
+            position_list.append(np.array(pos[i]))
+        for i, j in self.G.edges:
+            position_list.append((np.array(pos[i]) + np.array(pos[j])) / 2)
+        for i, pos_i in enumerate(position_list):
+            for j, pos_j in enumerate(position_list):
+                if i > j:
+                    distance = np.linalg.norm(pos_i - pos_j)
+                    if distance > distance_cutoff:
+                        energy += cut_off_energy
+                    else:
+                        energy += 1 / (np.linalg.norm(pos_i - pos_j))*3 / 1000
+        return energy
+
+    def optimize_positions(self, initial_pos=None, maxiter=5, distance_cutoff=0.1):
+        """
+        Waring, This potential only separate things away.
+        optimize the position of nodes to minimize the Lennard-Jones potential.
+        :param initial_pos: position, a dictionary from node index to position
+        :return: position, a dictionary from node index to position
+        """
+        if initial_pos is None:
+            initial_pos = nx.spring_layout(self.G, iterations=5, pos=self.guess_init_position())
+        pos_array = np.array([initial_pos[node] for node in self.G.nodes()]).flatten()
+
+        def opject_function(pos_array):
+            pos_dict = {node: pos_array[2 * i : 2 * i + 2] for i, node in enumerate(self.G.nodes())}
+            energy = self.coulomb_potential(pos_dict, distance_cutoff=distance_cutoff)
+            return energy
+
+        result = minimize(opject_function, pos_array,
+                          options={"maxiter": maxiter})
+        pos_array = result.x
+        optimized_pos = {node: pos_array[2 * i : 2 * i + 2] for i, node in enumerate(self.G.nodes())}
+        return optimized_pos
 
 
+def lj_pair(xy0, xy1, sigma: float, epsilon: float):
+    """
+    compute the Lennard-Jones potential between two coordinate
+    :param xy0: position of node 0
+    :param xy1: position of node 1
+    :return: energy, float
+    """
+    r = np.linalg.norm(np.array(xy0) - np.array(xy1))
+    s6 = (sigma / r) ** 6
+    return 4 * epsilon * (s6 ** 2 - s6)

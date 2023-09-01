@@ -127,67 +127,9 @@ class MyTestCase(unittest.TestCase):
         self.assertListEqual(reality[1].tolist(), np.linalg.matrix_power(p0, 4).tolist())
         self.assertListEqual(prediction[1].tolist(), np.linalg.matrix_power(p0, 4).tolist())
 
-    def test_SF_msm_merge_until(self):
-        msm = MSM.SF_msm([])
-        msm.set_state_str(["B A B A B A B A B A B C C D D C C D D".split(),
-                           "A B A B A B A B A B A D C D D C C D D".split(),
-                           "B A B A B A B A B A B D D C D C C D D".split()])
-        msm.calc_state_array()
-        msm.merge_until(rate_cut_off=0.01, rate_square_cut_off=0.01, node_cut_off=0.01, lag_step=1, physical_time=1, min_node=2)
-        t_matrix, net_t_matrix, rate_matrix, p_matrix = msm.get_matrix(lag_step=1, physical_time=1)
-        self.assertListEqual(msm.int_2_s[0], ["B", "A"])
-        self.assertListEqual(msm.int_2_s[1], ["D", "C"])
-        msm = MSM.SF_msm([])
-        msm.set_state_str(["B A B E A B E A B E A B E C C D D C C D D".split(),
-                           "E B A B E B A E B A E B A D C D D C C D D".split(),
-                           "A A B E A B E A B E A B E C C D D C C D D".split(),
-                           "E B A E B A E B A E B A D C D D C C D D C".split(),])
-        msm.calc_state_array()
-        reason = msm.merge_until(rate_cut_off=0.2, rate_square_cut_off=0.04, node_cut_off=0.01, lag_step=1, physical_time=1, min_node=2)
-        self.assertEqual(reason, "minimum node reached")
-        t_matrix, net_t_matrix, rate_matrix, p_matrix = msm.get_matrix(lag_step=1, physical_time=1)
-        self.assertListEqual(msm.int_2_s[0], ["B", "A", "E"])
-        self.assertListEqual(msm.int_2_s[1], ["D", "C"])
 
-        msm.calc_state_array()
-        reason = msm.merge_until(rate_cut_off=0.2, rate_square_cut_off=0.04, node_cut_off=0.01, lag_step=1, physical_time=1, min_node=3)
-        self.assertEqual(reason, "minimum node reached")
-        self.assertListEqual(msm.int_2_s[0], ["B", "A", "E"])
-        self.assertListEqual(msm.int_2_s[1], ["D"])
-        self.assertListEqual(msm.int_2_s[2], ["C"])
 
-    def test_SF_msm_merge_until_02(self):
-        msm = MSM.SF_msm([])
-        msm.set_state_str(["B A B A B A B A B A B C C D D C C D D".split(),
-                           "A B A B A B A B A B A D C D D C C D D".split(),
-                           "B A B A B A B A B A B D D C D C C D D E D".split()])
-        msm.calc_state_array()
-        reason = msm.merge_until(rate_cut_off=0.01, rate_square_cut_off=0.00, node_cut_off=0.1, lag_step=1, physical_time=1, method="rate_square", min_node=2)
-        t_matrix, net_t_matrix, rate_matrix, p_matrix = msm.get_matrix(lag_step=1, physical_time=1)
 
-        self.assertTupleEqual(t_matrix.shape, (3, 3))
-        self.assertListEqual(msm.int_2_s[0], ["B", "A"])
-        self.assertListEqual(msm.int_2_s[1], ["D", "C"])
-
-    def test_SF_msm_merge_until_03(self):
-        msm = MSM.SF_msm([])
-        msm.set_state_str(["B A B A B A B A B A B C C D D C C D D".split(),
-                           "A B A B A B A B A B A D C D D C C D D".split(),
-                           "B A B A B A B A B A B D D C D C C D D E D".split()])
-        msm.calc_state_array()
-        reason = msm.merge_until(rate_cut_off=0.00, rate_square_cut_off=0.00, node_cut_off=0.017, lag_step=1, physical_time=1, method="rate_square", min_node=2)
-        t_matrix, net_t_matrix, rate_matrix, p_matrix = msm.get_matrix(lag_step=1, physical_time=1)
-        print()
-        print(reason)
-        print("# transition matrix")
-        print(MSM.matrix_to_df(t_matrix, msm, cut_off=0.01))
-        print("# rate matrix")
-        print(MSM.matrix_to_df(rate_matrix, msm, cut_off=0.01))
-        print(msm.distribution)
-
-        self.assertTupleEqual(t_matrix.shape, (3, 3))
-        self.assertListEqual(msm.int_2_s[0], ["B", "A"])
-        self.assertListEqual(msm.int_2_s[1], ["D", "C"])
 
     def test_MFPT_A_to_B(self):
         traj_list = [(np.array("B A A C A A C C C B B".split()), [8]),
@@ -225,6 +167,16 @@ class MyTestCase(unittest.TestCase):
         MFPT_matrix, FPT_list1 = msm.get_MFPT_matrix()
         rate, FPT_list2 = msm.get_nfp_rate_matrix()
         self.assertListEqual(FPT_list1, FPT_list2)
+
+    def test_population_cutoff(self):
+        file_list = [f"04-output_wrapper/C_0.75_2ps/05-2ps/{i:02}/analysis/04-state-code/k_cylinder.log" for i in
+                     range(2)]
+        msm = MSM.SF_msm(file_list)
+        msm.calc_state_array()
+        n = msm.population_cutoff(0.01)
+        self.assertEqual(msm.population_cutoff(0.01), 10)
+        self.assertEqual(msm.population_cutoff(1/1002/2), 16)
+
 
     # plot
     def test_computer_pos(self):
