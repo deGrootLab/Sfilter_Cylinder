@@ -16,3 +16,4 @@
 /test/06-multi_rep/01-charmm-charge/07-C_0.70/
 /test/05-HRE/01-charmm-charge/distribution/*output.csv.*
 /test/06-multi_rep/01-charmm-charge/distribution/*output.csv.*
+/tutorial/md_???.npy
