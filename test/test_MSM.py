@@ -1,6 +1,7 @@
 import unittest
 from Sfilter import MSM
 import numpy as np
+from Sfilter import kinetics
 
 
 class MyTestCase(unittest.TestCase):
@@ -149,6 +150,14 @@ class MyTestCase(unittest.TestCase):
         for traj, answer in traj_list:
             mfpt_list = MSM.MFPT_A_to_B(traj, "A", "B")
             self.assertListEqual(mfpt_list, answer)
+            model = kinetics.Sf_model()
+            model.set_traj_from_str([traj.tolist()], time_step=1)
+            passage_track_alltraj = model.calc_passage_time()
+            if "B" in model.node_map_s_2_int:
+                passage_track_A_B = passage_track_alltraj[0] [model.node_map_s_2_int['A']] [model.node_map_s_2_int['B']]
+                self.assertListEqual(passage_track_A_B, answer)
+            else:
+                self.assertListEqual(answer, [])
 
     def test_MFPT_pair(self):
         file_list = [f"04-output_wrapper/C_0.75_2ps/05-2ps/{i:02}/analysis/04-state-code/k_cylinder.log" for i in
@@ -157,6 +166,18 @@ class MyTestCase(unittest.TestCase):
         msm.calc_state_array()
         mfpt_01 = msm.get_MFPT_pair(0, 1)
         self.assertListEqual(mfpt_01[:2], [152, 71])
+
+    def test_mfpt_kinetic_model(self):
+        file_list = [f"04-output_wrapper/C_0.75_2ps/05-2ps/{i:02}/analysis/04-state-code/k_cylinder.log" for i in
+                     range(2)]
+        msm = MSM.SF_msm(file_list)
+        msm.calc_state_array()
+        mfpt_01 = msm.get_MFPT_pair(0, 1)
+        model = kinetics.Sf_model(file_list)
+        mfpt, mfpt_every_traj = model.get_mfpt()
+        self.assertAlmostEqual(mfpt[0,1], np.mean(mfpt_01) * msm.time_step[0])
+        self.assertListEqual(model.passage_time_length_every_traj[0][0][1][:2], mfpt_01[:2])
+        self.assertListEqual(model.passage_time_length_every_traj[1][0][1], mfpt_01[2:])
 
     def test_MFPT_matrix(self):
         file_list = [f"04-output_wrapper/C_0.75_2ps/05-2ps/{i:02}/analysis/04-state-code/k_cylinder.log" for i in
