@@ -715,18 +715,20 @@ class Graph:
                         self.G.add_edge(j, i, weight=rate_matrix[j, i])
 
     def add_weighted_edges_from_rate_nfp_netF(self, rate_cut_off, net_F_cut_off=0, rate_matrix=None, net_F=None,
-                                              label_format="{:d}"):
+                                              label_format="{:d}", rate_scale=None):
         """
         Add edge based on rate and net flux.
         if a positive net flux has a rate above rate_cut_off, add the edge.
         The weight of the edge is the rate.
         The label of the edge is the net flux.
-        If you do this twice, all of the edges will be overwritten.
+        If you do this twice, all the edges will be overwritten.
         :param rate_cut_off: minimum rate to add an edge
         :param net_F_cut_off: minimum net flux to add an edge
         :param rate_matrix: rate matrix, if not given, will recalculate from model.get_nfp_rate_matrix()
         :param net_F: net flux matrix, if not given, will recalculate from model.get_matrix()
         :param label_format: format of the label. default is "{:d}"
+        :param rate_scale: scale of the rate. default is None (linear),
+            if you provide a function (such as np.log10), the edge-weight will be scaled.
         :return: None
         """
         if rate_matrix is None:
@@ -738,10 +740,16 @@ class Graph:
             for j in self.G.nodes:
                 if i > j:
                     if net_F[i, j] > net_F_cut_off and rate_matrix[i, j] > rate_cut_off:
-                        self.G.add_edge(i, j, weight=rate_matrix[i, j])
+                        r = rate_matrix[i, j]
+                        if rate_scale is not None:
+                            r = rate_scale(r)
+                        self.G.add_edge(i, j, weight=r)
                         self.G.edges[i, j]["label"] = label_format.format(net_F[i, j])
                     elif net_F[j, i] > net_F_cut_off and rate_matrix[j, i] > rate_cut_off:
-                        self.G.add_edge(j, i, weight=rate_matrix[j, i])
+                        r = rate_matrix[j, i]
+                        if rate_scale is not None:
+                            r = rate_scale(r)
+                        self.G.add_edge(j, i, weight=r)
                         self.G.edges[j, i]["label"] = label_format.format(net_F[j, i])
 
     def add_edge_label_from_net_F(self, net_F=None, label_format="{:.2e}"):
