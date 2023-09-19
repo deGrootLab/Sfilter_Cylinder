@@ -22,7 +22,7 @@ def read_cylinder(cylinder_file):
         meta_data_dict = {}
         while i < len(lines):
             l = lines[i]
-            if ("Permeation up 4 -> 1 -> 3" in l):
+            if "Permeation up 4 -> 1 -> 3" in l:
                 for j in range(2, len(lines) - i):
                     l = lines[i + j]
                     if ("Permeation up 3 -> 1 -> 4" in l) or "None" in l or l == "\n":
@@ -34,7 +34,7 @@ def read_cylinder(cylinder_file):
                         p_time.append(float(words[2]))
                         p_resident_time.append(float(words[3]))
                         p_up.append(True)
-            elif ("Permeation up 3 -> 1 -> 4" in l):
+            elif "Permeation up 3 -> 1 -> 4" in l:
                 for j in range(2, len(lines) - i):
                     l = lines[i + j]
                     if ("##############" in l) or "None" in l or l == "\n":
@@ -247,7 +247,7 @@ def line_to_state(line):
 
 def read_k_cylinder(file, method="K_priority"):
     """
-    read output file from k_cylinder
+    read 1 output file from k_cylinder
     Args:
         file: output file from k_cylinder
         method: "K_priority" or "Co-occupy"
@@ -316,6 +316,46 @@ def read_k_cylinder(file, method="K_priority"):
         else:
             raise ValueError("method should be K_priority or Co-occupy")
     return state_list, meta_data, K_occupency, W_occupency
+
+def read_k_cylinder_list(file_list, method="K_priority"):
+    """
+    read a list of output file from k_cylinder
+    This is designed for reading a sequence of MD simulation that can be concatenated together.
+    Args:
+        file_list: one file or a list of files.
+        method: "K_priority" or "Co-occupy"
+        In "K_priority", if there is a K in the binding site, letter K will be assigned.
+        In "Co-occupy", if there is a K and one or more water in the binding site, letter C will be assigned.
+    return:
+        state_list, states string is a list
+        meta_data, a dict
+        K_occupency, a list of K occupancy
+        W_occupency, a list of W occupancy
+    """
+    # if file_list is a str, read file using read_k_cylinder, otherwise, read files one by one
+    if isinstance(file_list, str) or isinstance(file_list, Path):
+        state_list, meta_data, K_occupency, W_occupency = read_k_cylinder(file_list, method)
+    elif isinstance(file_list, list):
+        # make sure file exists
+        for f in file_list:
+            if not Path(f).exists():
+                raise FileNotFoundError(f)
+        if len(file_list) == 1:
+            state_list, meta_data, K_occupency, W_occupency = read_k_cylinder(file_list[0], method)
+        else:
+            state_list, meta_data, K_occupency, W_occupency = read_k_cylinder(file_list[0], method)
+            for f in file_list[1:]:
+                s_list_tmp, meta_data_tmp, K_occu_tmp, W_occu_tmp = read_k_cylinder(f, method)
+                state_list.extend(s_list_tmp[1:])
+                if meta_data_tmp != meta_data:
+                    raise ValueError("meta_data is different in different files. Please check " + str(f))
+                K_occupency.extend(K_occu_tmp[1:])
+                W_occupency.extend(W_occu_tmp[1:])
+    else:
+        raise TypeError("file_list must be a str or a list of str")
+
+    return state_list, meta_data, K_occupency, W_occupency
+
 
 
 # class for reading (a list of) std_out
