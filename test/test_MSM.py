@@ -5,16 +5,6 @@ from Sfilter import kinetics
 
 
 class MyTestCase(unittest.TestCase):
-    def test_MSM_read_k_cylinder(self):
-        s_list, time_step, K_occupency, W_occupency = MSM.read_k_cylinder("04-output_wrapper/C_0.75_2ps/05-2ps/00/analysis/04-state-code/k_cylinder.log")
-        self.assertListEqual(s_list[:3], ["WK0KKW", "WK0KKW", "WK0KKW"])
-
-
-
-    def test_read_state_file_co_occupy(self):
-        s_list, time_step, K_occupency, W_occupency = MSM.read_k_cylinder("04-output_wrapper/C_0.75_2ps/05-2ps/00/analysis/04-state-code/k_cylinder.log", method="Co-occupy")
-        self.assertListEqual(s_list[:3], ["WK0KKW", "WK0KKW", "WK0KKW"])
-        self.assertListEqual(s_list[405:408], ["WK0KKC", "WK0KKC", "WKK0KW"])
 
     def test_SF_msm_init(self):
         file_list = [f"04-output_wrapper/C_0.75_2ps/05-2ps/{i:02}/analysis/04-state-code/k_cylinder.log" for i in range(2)]

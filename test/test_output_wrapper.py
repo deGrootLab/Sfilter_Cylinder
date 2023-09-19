@@ -2,6 +2,8 @@ import unittest
 import Sfilter
 from Sfilter import Perm_event_output
 from Sfilter import Cylinder_output
+from Sfilter.util.output_wrapper import read_k_cylinder
+from Sfilter.util.output_wrapper import read_k_cylinder_list
 
 class MyTestCase(unittest.TestCase):
     def test_line_to_state(self):
@@ -79,6 +81,64 @@ class MyTestCase(unittest.TestCase):
         #print(state_distribution)
         self.assertListEqual(state_distribution[0][:2], ["WKK0KW", (201 + 121) / 1002])
         self.assertListEqual(state_distribution[1][:2], ["KK0KKW", (41 + 166) / 1002])
+
+    def test_read_k_cylinder(self):
+        print("# TESTING read_k_cylinder, see if we can read the correct 6 letter code and meta data")
+        s_list, meta_data, K_occupency, W_occupency = read_k_cylinder("04-output_wrapper/C_0.75_2ps/05-2ps/00"
+                                                                      "/analysis/04-state-code/k_cylinder.log")
+        self.assertListEqual(s_list[:3], ["WK0KKW", "WK0KKW", "WK0KKW"])
+        # meta_data
+        self.assertDictEqual(meta_data,
+                             {"time_step": 2.0, })
+
+    def test_read_state_file_co_occupy(self):
+        print("# TESTING read_k_cylinder, Co-occupy. 6 letter code contains K, W, and C")
+        s_list, meta_data, K_occupency, W_occupency = read_k_cylinder("04-output_wrapper/C_0.75_2ps/05-2ps/00"
+                                                                      "/analysis/04-state-code/k_cylinder.log",
+                                                                      method="Co-occupy")
+        self.assertListEqual(s_list[:3], ["WK0KKW", "WK0KKW", "WK0KKW"])
+        self.assertListEqual(s_list[405:408], ["WK0KKC", "WK0KKC", "WKK0KW"])
+        self.assertDictEqual(meta_data,
+                             {"time_step": 2.0, })
+
+    def test_read_k_cylinder_list(self):
+        print("# TESTING read_k_cylinder_list, read a sequence of k_cylinder.log files")
+        f_list = ["04-output_wrapper/C_0.75_2ps/05-2ps/00/analysis/04-state-code/k_cylinder.log",
+                  "04-output_wrapper/C_0.75_2ps/05-2ps/01/analysis/04-state-code/k_cylinder.log"
+                  ]
+        s_list, meta_data, K_occupency, W_occupency = read_k_cylinder_list(f_list)
+        self.assertListEqual(s_list[:3], ["WK0KKW", "WK0KKW", "WK0KKW"])
+        self.assertEqual(len(s_list), 1001)
+        self.assertDictEqual(meta_data,
+                             {"time_step": 2.0, })
+        self.assertEqual(len(K_occupency), 1001)
+        self.assertListEqual(K_occupency[:3],
+                             [
+                                 [0, 1, 0, 1, 1, 0],
+                                 [0, 1, 0, 1, 1, 0],
+                                 [0, 1, 0, 1, 1, 0]
+                             ])
+        self.assertEqual(len(W_occupency), 1001)
+        self.assertListEqual(W_occupency[:3],
+                             [
+                                 [2, 0, 0, 0, 0, 15],
+                                 [2, 0, 0, 0, 0, 14],
+                                 [2, 0, 0, 0, 0, 12]
+                             ])
+
+        self.assertListEqual(s_list[500:503], ["WKK0KK", "KK0KKW", "KK0KKW"])
+        self.assertListEqual(K_occupency[500:503],
+                             [
+                                 [0, 1, 1, 0, 1, 1],
+                                 [1, 1, 0, 1, 1, 0],
+                                 [1, 1, 0, 1, 1, 0]
+                             ])
+        self.assertListEqual(W_occupency[500:503],
+                             [
+                                 [2, 0, 0, 0, 0, 11],
+                                 [0, 0, 0, 0, 0, 14],
+                                 [0, 0, 0, 0, 0, 9]
+                             ])
 
 
 
