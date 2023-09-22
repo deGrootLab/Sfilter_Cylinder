@@ -277,7 +277,6 @@ def prepare_non_water(sf, K_name, non_wat):
     """
     Prepare the non-water selection.
     This selection would include all the atoms that we include in the permeation count.
-    Water (resname SOL) must come after the non-water atoms in the provided topology.
     Args:
         sf: sf object
         K_name: a list of atom names, such as ["POT", "SOD"]
@@ -287,10 +286,10 @@ def prepare_non_water(sf, K_name, non_wat):
     :return: a MDAnalysis selection
     """
     # check water comes after non-water atoms
-    min_water_index = np.min(sf.u.select_atoms('resname SOL').residues.atoms.ix)
-    max_non_water_index = np.max(sf.u.select_atoms('not resname SOL').residues.atoms.ix)
-    if min_water_index < max_non_water_index:
-        raise ValueError("Water (resname SOL) must come after non-water atoms in the provided topology.")
+    # min_water_index = np.min(sf.u.select_atoms('resname SOL').residues.atoms.ix)
+    # max_non_water_index = np.max(sf.u.select_atoms('not resname SOL').residues.atoms.ix)
+    # if min_water_index < max_non_water_index:
+    #     raise ValueError("Water (resname SOL) must come after non-water atoms in the provided topology.")
     if non_wat == "nWat":  # all non-water atoms
         non_water = sf.u.select_atoms(
             'not resname SOL')  # select_atoms() sorts the atoms by atom index before returning them
@@ -471,6 +470,12 @@ if __name__ == "__main__":
         distance_array = np.zeros((1, wat_selection.n_atoms))  # prepare the distance matrix array on memory
         print(f"The non-water atoms to keep are \"{args.non_wat}\"")
         non_water = prepare_non_water(sf, args.K_name, args.non_wat)
+        # if there is water that has lower index than non-water atoms, raise warning
+        min_water_index = np.min(wat_selection.residues.atoms.ix)
+        max_non_water_index = np.max(non_water.residues.atoms.ix)
+        if min_water_index < max_non_water_index:
+            warnings.warn("Water (resname SOL) should come after non-water atoms. In the output trajectory, "
+                          "I will keep the original order.")
         print("The water-redueced pdb file is : " + os.path.splitext(args.reduced_xtc)[0] + f"_{args.non_wat}.pdb")
         with mda.Writer(args.reduced_xtc, n_atoms=non_water.n_atoms + args.n_water * 3) as W:
             for ts in u.trajectory:
@@ -483,7 +488,9 @@ if __name__ == "__main__":
 
                 # write the reduced trajectory
                 waters = get_closest_water(sf.sf_oxygen[-2], wat_selection, args.n_water, distance_array)
-                W.write(non_water + waters)
+                output_selection = non_water + waters
+                output_selection = output_selection.residues.atoms
+                W.write(output_selection)
         # loop over trajectory ends here
         # write a water-reduced pdb
         u_pdb = mda.Universe(args.top.name)
@@ -493,7 +500,9 @@ if __name__ == "__main__":
         non_water = prepare_non_water(sf_pdb, args.K_name, args.non_wat)
         waters = get_closest_water(sf_pdb.sf_oxygen[-2], wat_selection, args.n_water, distance_array)
 
-        (non_water + waters).write(os.path.splitext(args.reduced_xtc)[0] + f"_{args.non_wat}.pdb")
+        output_selection = non_water + waters
+        output_selection = output_selection.residues.atoms
+        output_selection.write(os.path.splitext(args.reduced_xtc)[0] + f"_{args.non_wat}.pdb")
 
     print("#################################################################################")
     knows_charge_table = {"POT": 1, "K": 1,
