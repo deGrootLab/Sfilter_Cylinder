@@ -321,6 +321,8 @@ def read_k_cylinder_list(file_list, method="K_priority"):
     """
     read a list of output file from k_cylinder
     This is designed for reading a sequence of MD simulation that can be concatenated together.
+    The first frame of the second (and later) simulation will be discarded. Gromacs writes the initial frame to the traj
+    file, which is the same as the last frame of the previous simulation.
     Args:
         file_list: one file or a list of files.
         method: "K_priority" or "Co-occupy"
