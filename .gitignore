@@ -18,3 +18,4 @@
 /test/06-multi_rep/01-charmm-charge/distribution/*output.csv.*
 /tutorial/md_???.npy
 /test/01-NaK2K/1-Charmm/free_energy/Reaction1/19/k_cylinder/07-200wat/fix_100water_SF.pdb
+/script/*_perm_event.out
