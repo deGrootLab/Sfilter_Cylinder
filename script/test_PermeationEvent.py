@@ -249,6 +249,47 @@ class MyTestCase(unittest.TestCase):
         os.remove(xtc_out1)
         os.remove(xtc_out2)
 
+    def test_count_cylinder_04(self):
+        print("\n# Test count_cylinder.py. Prepare Water reduced traj on a pdb that has water before the POT")
+        xtc_out = "../test/01-NaK2K/1-Charmm/free_energy/Reaction1/19/k_cylinder/07-200wat/fix_100water.xtc"
+        args1 = "-pdb ../test/01-NaK2K/1-Charmm/free_energy/Reaction1/19/start_hard.pdb " \
+                "-xtc ../test/01-NaK2K/1-Charmm/free_energy/Reaction1/19/fix_c_10frame.xtc " \
+                "-K POT -SF_seq THR VAL GLY TYR GLY -n_water 100 " \
+                "-cylinderRad 3.5 -S5_z_cutoff 4 -S5_r_cutoff 9 " \
+                "-reduced_xtc " + xtc_out + " -non_wat SF"
+        args2 = "-pdb ../test/01-NaK2K/1-Charmm/free_energy/Reaction1/19/k_cylinder/07-200wat/fix_100water_SF.pdb " \
+                "-xtc ../test/01-NaK2K/1-Charmm/free_energy/Reaction1/19/k_cylinder/07-200wat/fix_100water.xtc " \
+                "-K POT -SF_seq THR VAL GLY TYR GLY " \
+                "-cylinderRad 3.5 -S5_z_cutoff 4 -S5_r_cutoff 9 "
+        if os.path.isfile(xtc_out):
+            os.remove(xtc_out)
+        commands = ["count_cylinder.py " + args1,
+                    "count_cylinder.py " + args2,
+                    ]
+        for command in commands:
+            results = subprocess.run(command, shell=True, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            res_text = results.stdout.decode('utf-8').split("\n")
+            res_err = results.stderr.decode('utf-8').split("\n")
+            # print(res_err)
+            letter_codes = []
+            POT_index = []
+            for line in res_text:
+                if "# S6l" in line:
+                    letter_codes.append(line.split()[-1])
+                if " POT :" in line:
+                    POT_line = line.split(",")[0]
+                    POT_words = POT_line.split(":")[1].split()
+                    if POT_words != []:
+                        index = int(POT_words[0])
+                        POT_index.append(index)
+            self.assertListEqual(letter_codes, ["WK0K0K", "WK0K0K", "WK0K0K", "WK0K0K", "WK0K0K",
+                                                "WK0KWW", "WK0K0K", "WK0KKW", "WK0K0K", "WK0KKW",
+                                                "WK0KWK",
+                                                ])
+        if os.path.isfile(xtc_out):
+            os.remove(xtc_out)
+
+
 
 if __name__ == '__main__':
     unittest.main()

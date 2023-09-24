@@ -277,6 +277,7 @@ def prepare_non_water(sf, K_name, non_wat):
     """
     Prepare the non-water selection.
     This selection would include all the atoms that we include in the permeation count.
+    The atoms will be sorted by atom index.
     Args:
         sf: sf object
         K_name: a list of atom names, such as ["POT", "SOD"]
@@ -475,7 +476,7 @@ if __name__ == "__main__":
         max_non_water_index = np.max(non_water.residues.atoms.ix)
         if min_water_index < max_non_water_index:
             warnings.warn("Water (resname SOL) should come after non-water atoms. In the output trajectory, "
-                          "I will keep the original order.")
+                          "I will move the water after the non-water atoms as the water selection is dynamic.")
         print("The water-redueced pdb file is : " + os.path.splitext(args.reduced_xtc)[0] + f"_{args.non_wat}.pdb")
         with mda.Writer(args.reduced_xtc, n_atoms=non_water.n_atoms + args.n_water * 3) as W:
             for ts in u.trajectory:
@@ -488,8 +489,7 @@ if __name__ == "__main__":
 
                 # write the reduced trajectory
                 waters = get_closest_water(sf.sf_oxygen[-2], wat_selection, args.n_water, distance_array)
-                output_selection = non_water + waters
-                output_selection = output_selection.residues.atoms
+                output_selection = non_water + waters  # you should not reorder this AtomGroup
                 W.write(output_selection)
         # loop over trajectory ends here
         # write a water-reduced pdb
@@ -500,8 +500,7 @@ if __name__ == "__main__":
         non_water = prepare_non_water(sf_pdb, args.K_name, args.non_wat)
         waters = get_closest_water(sf_pdb.sf_oxygen[-2], wat_selection, args.n_water, distance_array)
 
-        output_selection = non_water + waters
-        output_selection = output_selection.residues.atoms
+        output_selection = non_water + waters  # you should not reorder this AtomGroup
         output_selection.write(os.path.splitext(args.reduced_xtc)[0] + f"_{args.non_wat}.pdb")
 
     print("#################################################################################")
