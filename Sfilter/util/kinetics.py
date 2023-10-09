@@ -121,7 +121,7 @@ class Sf_model:
                 raise ValueError("The time step between files are not the same.", str(time_step_list))
 
             self.set_traj_from_str(traj_tmp_list, time_step_list[0] * step, dtype=traj_dtype, dtype_lumped=traj_dtype)
-            self.calc_passage_time_raw()
+            # self.calc_passage_time_raw()
 
     def set_traj_from_str(self, traj_list, time_step, dtype=np.int8, dtype_lumped=np.int8):
         """
@@ -151,6 +151,7 @@ class Sf_model:
             self.traj_raw.append(np.array([self.state_map_s_2_int[s] for s in traj], dtype=dtype))
 
         self.set_lumping_from_str([], dtype_lumped)  # At the end of this function, properties will be calculated.
+        self.calc_passage_time_raw()
         # including
         # self.flux_matrix,
         # self.flux_matrix_every_traj,
@@ -389,7 +390,7 @@ class Sf_model:
 
     def get_mfpt(self, traj_type="lumped"):
         """
-        compute and return the mfpt from self.passage_time_length_every_traj
+        Compute and return the mfpt from self.passage_time_length_every_traj
         :param traj_type: "lumped" or "raw"
         :return: mfpt, a np.array of size (n, n), mfpt from every node to every node.
                  mfpt_every_traj, mfpt for individual traj.
@@ -406,6 +407,8 @@ class Sf_model:
                 self.calc_passage_time()
             passage_time = self.passage_time_length_every_traj
             node_num_length = len(self.node_map_int_2_s)
+        else:
+            raise ValueError("traj_type should be 'lumped' or 'raw'.")
 
         mfpt_every_traj = []
 
@@ -424,7 +427,7 @@ class Sf_model:
         for i in range(node_num_length):
             for j in range(node_num_length):
                 if i != j:
-                    passage_list = [p_time for traj in self.passage_time_length_every_traj for p_time in traj[i][j] ]
+                    passage_list = [p_time for traj in passage_time for p_time in traj[i][j] ]
                     if len(passage_list) == 0:
                         mfpt[i, j] = np.nan
                         # warnings.warn(f"no passage found for {self.node_map_int_2_s[i]} to {self.node_map_int_2_s[j]}.")
@@ -433,50 +436,69 @@ class Sf_model:
 
         return mfpt, mfpt_every_traj
 
-    def get_rate_inverse_mfpt(self):
+    def get_rate_inverse_mfpt(self, traj_type="lumped"):
         """
-        compute and return the rate. This rate_ij is defined as : 1 / mfpt_ij
+        Compute and return the rate. This rate_ij is defined as : 1 / mfpt_ij
+        :param traj_type: "lumped" or "raw"
         :return: rate, a np.array of size (n, n), rate from every node to every node.
                  rate_every_traj, a list of rate for individual traj.
         """
-        mfpt, mfpt_every_traj = self.get_mfpt()
+        mfpt, mfpt_every_traj = self.get_mfpt(traj_type)
         rate = np.zeros_like(mfpt)
-        for i in range(len(self.node_map_int_2_s)):
-            for j in range(len(self.node_map_int_2_s)):
+        for i in range(mfpt.shape[0]):
+            for j in range(mfpt.shape[1]):
                 if i != j:
                     rate[i, j] = 1 / mfpt[i, j]
         rate_every_traj = []
         for mfpt_tmp in mfpt_every_traj:
             rate_tmp = np.zeros_like(mfpt_tmp)
-            for i in range(len(self.node_map_int_2_s)):
-                for j in range(len(self.node_map_int_2_s)):
+            for i in range(mfpt.shape[0]):
+                for j in range(mfpt.shape[1]):
                     if i != j:
                         rate_tmp[i, j] = 1 / mfpt_tmp[i, j]
             rate_every_traj.append(rate_tmp)
         return rate, rate_every_traj
 
-    def get_rate_passage_time(self):
+    def get_rate_passage_time(self, traj_type="lumped"):
         """
-        compute and return the rate. This rate_ij is defined as : number of passage / (total frame of i * time_step)
+        Compute and return the rate. This rate_ij is defined as : number of passage / (total frame of i * time_step)
+        :param traj_type: "lumped" or "raw"
         :return: rate, a np.array of size (n, n), rate from every node to every node.
                  rate_every_traj, a list of rate for individual traj.
         """
-        if self.passage_time_length_every_traj is None:
-            warnings.warn("self.passage_time_length_every_traj is None. Calculating passage time.")
-            self.calc_passage_time()
-        rate = np.zeros((len(self.node_map_int_2_s), len(self.node_map_int_2_s)))
-        for i in range(len(self.node_map_int_2_s)):
-            for j in range(len(self.node_map_int_2_s)):
+        if traj_type == "raw":
+            if self.passage_time_length_every_traj_raw is None:
+                warnings.warn("self.passage_time_length_every_traj_raw is None. Calculating passage time.")
+                self.calc_passage_time_raw()
+            passage_time = self.passage_time_length_every_traj_raw
+            node_num_length = len(self.state_map_int_2_s)
+            # counter = self.state_Counter
+            counter = Counter([i for traj in self.traj_raw for i in traj])
+            traj_list = self.traj_raw
+        elif traj_type == "lumped":
+            if self.passage_time_length_every_traj is None:
+                warnings.warn("self.passage_time_length_every_traj is None. Calculating passage time.")
+                self.calc_passage_time()
+            passage_time = self.passage_time_length_every_traj
+            node_num_length = len(self.node_map_int_2_s)
+            counter = self.node_Counter
+            traj_list = self.traj_node
+        else:
+            raise ValueError("traj_type should be 'lumped' or 'raw'.")
+
+        rate = np.zeros((node_num_length, node_num_length))
+        for i in range(node_num_length):
+            for j in range(node_num_length):
                 if i != j:
-                    passage_list = [p_time for traj in self.passage_time_length_every_traj for p_time in traj[i][j] ]
-                    rate[i, j] = len(passage_list) / (self.node_Counter[i] * self.time_step)
+                    passage_list = [p_time for traj in passage_time for p_time in traj[i][j] ]
+                    rate[i, j] = len(passage_list) / (counter[i] * self.time_step)
         rate_every_traj = []
-        for passage_time_length, traj in zip(self.passage_time_length_every_traj, self.traj_node):
-            rate_tmp = np.zeros((len(self.node_map_int_2_s), len(self.node_map_int_2_s)))
-            for i in range(len(self.node_map_int_2_s)):
+        for passage_time_length, traj in zip(passage_time, traj_list):
+            rate_tmp = np.zeros((node_num_length, node_num_length))
+            for i in range(node_num_length):
                 frame_num_i = np.sum(traj == i)
                 time_i = frame_num_i * self.time_step
-                for j in range(len(self.node_map_int_2_s)):
+                for j in range(node_num_length):
                     if i != j:
                         rate_tmp[i, j] = len(passage_time_length[i][j]) / time_i
             rate_every_traj.append(rate_tmp)

@@ -93,7 +93,7 @@ class MyTestCase(unittest.TestCase):
         self.assertEqual(len(traj_str[1]), 501)
 
     def test_set_lumping_from_str(self):
-        print("TESTING: set_lumping_from_str. Can we lump the states and still get the correct distribution?")
+        print("#TESTING: set_lumping_from_str. Can we lump the states and still get the correct distribution?")
         base = Path("04-output_wrapper/C_0.75_2ps/05-2ps")
         file_list = [base / f"{i:02}/analysis/04-state-code/k_cylinder.log" for i in range(2)]
         k_model = kinetics.Sf_model(file_list)
@@ -168,7 +168,7 @@ class MyTestCase(unittest.TestCase):
         check_answer1()
 
     def test_calc_properties(self):
-        print("TESTING: flux, net_flux, transition_probability")
+        print("#TESTING: flux, net_flux, transition_probability")
         traj_l = ["A A B A B A B C C".split(),
                   "A B A B A B A C C".split(),
                   "A A A A A A B C C".split()]
@@ -219,7 +219,7 @@ class MyTestCase(unittest.TestCase):
         assert_2d_int_arrays_equal(ptime_point[0], answer)
 
     def test_calc_passage_time(self):
-        print("TESTING: calc_passage_time.")
+        print("#TESTING: calc_passage_time.")
         traj_l = ["A A A A A B B B A B A".split(),
                   "A A B C A B C A B C A B".split(),
                   "A A B C A A B C A B C A B".split()]
@@ -258,6 +258,91 @@ class MyTestCase(unittest.TestCase):
         assert_allclose(mfpt_every_traj[0], [[0., 3., np.nan],
                                              [2., 0., np.nan],
                                              [np.nan, np.nan, 0.]], equal_nan=True)
+
+    def test_get_rate_inverse_mfpt(self):
+        print("#TESTING: get_rate_inverse_mfpt. This function calculate the rate from every node to every node")
+        traj_l = ["A A B A A B A A B A".split(),
+                  "A A B A A B A A B".split()]
+        for traj_type in ["lumped", "raw"]:
+            k_model = kinetics.Sf_model()
+            k_model.set_traj_from_str(traj_l, time_step=1)
+            rate, rate_every_traj = k_model.get_rate_inverse_mfpt(traj_type)
+            for i in [rate, rate_every_traj[0], rate_every_traj[1]]:
+                self.assertListEqual(i.tolist(), [
+                    [0,   1/2],
+                    [1,   0]])
+
+        traj_l = ["A A A B C A A A C B A".split(),
+                  "A A A C B A A A B B".split()]
+        k_model = kinetics.Sf_model()
+        k_model.set_traj_from_str(traj_l, time_step=1)
+        k_model.set_lumping_from_str([("B", "C")])
+        rate, rate_every_traj = k_model.get_rate_inverse_mfpt("lumped")
+        self.assertListEqual(rate.tolist(), [
+            [0,     4 / 12],
+            [3 / 6,      0]])
+        self.assertListEqual(rate_every_traj[0].tolist(), [
+            [0,     2 / 6],
+            [2 / 4,      0]])
+        self.assertListEqual(rate_every_traj[1].tolist(), [
+            [0,     2 / 6],
+            [1 / 2,     0]])
+        rate, rate_every_traj = k_model.get_rate_inverse_mfpt("raw")
+        self.assertListEqual(rate.tolist(), [
+            [0,     4 / 14, 3 / 10],
+            [3 / 4,      0,   1 / 1],
+            [3 / 5,   2 / 6,      0]])
+        self.assertListEqual(rate_every_traj[0].tolist(), [
+            [0,      2 / 7, 2 / 7],
+            [2 / 3,      0,  1 / 1],
+            [2 / 3,  1 / 5,      0]])
+
+    def test_get_rate_passage_time(self):
+        print("#TESTING: get_rate_passage_time. This function calculate the rate from everything to everything")
+        traj_l = ["A A B A A B A A B A".split(),
+                  "A A B A A B A A B".split()]
+        for traj_type in ["lumped", "raw"]:
+            k_model = kinetics.Sf_model()
+            k_model.set_traj_from_str(traj_l, time_step=1)
+            rate, rate_every_traj = k_model.get_rate_passage_time(traj_type)
+            self.assertListEqual(rate.tolist(),
+                                 [[0,   6/13],
+                                  [5/6,   0]])
+            self.assertListEqual(rate_every_traj[0].tolist(),
+                                 [[0,   3/7],
+                                  [3/3,   0]])
+            self.assertListEqual(rate_every_traj[1].tolist(),
+                                 [[0,   3/6],
+                                  [2/3,   0]])
+
+        traj_l = ["A A A B C A A A C B A".split(),
+                  "A A A C B A A A B B".split()]
+        k_model = kinetics.Sf_model()
+        k_model.set_traj_from_str(traj_l, time_step=1)
+        k_model.set_lumping_from_str([("B", "C")])
+        rate, rate_every_traj = k_model.get_rate_passage_time("lumped")
+        self.assertListEqual(rate.tolist(), [
+            [0,    4 / 13],
+            [3 / 8,     0]])
+        self.assertListEqual(rate_every_traj[0].tolist(), [
+            [0,    2 / 7],
+            [2 / 4,    0]])
+        self.assertListEqual(rate_every_traj[1].tolist(), [
+            [0,    2 / 6],
+            [1 / 4,    0]])
+        rate, rate_every_traj = k_model.get_rate_passage_time("raw")
+        self.assertListEqual(rate.tolist(), [
+            [0,     4 / 13, 3 / 13],
+            [3 / 5,      0,  1 / 5],
+            [3 / 3,   2 / 3,     0]])
+        self.assertListEqual(rate_every_traj[0].tolist(), [
+            [0,     2 / 7, 2 / 7],
+            [2 / 2,     0, 1 / 2],
+            [2 / 2,   1 / 2,     0]])
+        self.assertListEqual(rate_every_traj[1].tolist(), [
+            [0,     2 / 6, 1 / 6],
+            [1 / 3,     0, 0 / 3],
+            [1 / 1,   1 / 1,     0]])
 
 
 if __name__ == '__main__':
