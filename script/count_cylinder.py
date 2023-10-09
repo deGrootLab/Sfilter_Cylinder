@@ -245,7 +245,7 @@ def get_closest_water(center_selection, water_O_selection, n_water, distance_arr
     """
     center = center_selection.center_of_geometry()
     dist_matrix = distances.distance_array(center, water_O_selection.positions,
-                                           box=water_O_selection.dimensions, result=distance_array, backend="serial" )
+                                           box=water_O_selection.dimensions, result=distance_array, backend="serial")
     closest_indices = dist_matrix.argsort()[:, :n_water]
     closest_indices = closest_indices.reshape(-1)
     closest_indices.sort()
