@@ -6,22 +6,69 @@ from .output_wrapper import read_k_cylinder
 from collections import Counter
 
 
+def count_passage(traj_list, num_of_node):
+    """
+    Count the passage on a list of trajectory.
+    :param traj_list: A list of trajectory. Each trajectory is a list(np.array) of int.
+    :param num_of_node: number of nodes. Assume the nodes are 0, 1, 2, ..., num_of_node-1.
+    :return:
+        passage_time_length_every_traj
+            a list of matrix. One matrix for each traj. matrix[i][j] is a list of passage time(unit in step)
+            from node_i to node_j.
+        passage_time_point_every_traj
+            a list of matrix. One matrix for each traj. matrix[i][j] is a list of time point (unit in step)
+            when the passage from node_i to node_j finished .
+    """
+    passage_time_length_every_traj = []
+    passage_time_point_every_traj = []  # the time point when the passage finished
+    for traj in traj_list:
+        passage_time_length = []
+        passage_time_point = []
+        for i in range(num_of_node):
+            passage_time_length.append([[] for _ in range(num_of_node)])
+            passage_time_point.append([[] for _ in range(num_of_node)])
+        starting_time = np.zeros((num_of_node, num_of_node), dtype=np.int64) - 1
+        j = traj[0]
+        starting_time[j, :] = 0
+        for frame_i, (si, sj) in enumerate(zip(traj[:-1], traj[1:])):
+            if si != sj:
+                for i, start_i in enumerate(starting_time[:, sj]):
+                    if start_i != -1 and i != sj:
+                        # successful passage from i to sj, from time start_i to frame_i+1
+                        passage_time_length[i][sj].append(frame_i + 1 - start_i)
+                        passage_time_point[i][sj].append(frame_i + 1)
+                        starting_time[i, sj] = -1
+                starting_time[sj, :][starting_time[sj, :] == -1] = frame_i + 1
+
+        # Convert list to numpy array to save memory
+        for i in range(num_of_node):
+            for j in range(num_of_node):
+                passage_time_length[i][j] = np.array(passage_time_length[i][j], dtype=np.int64)
+                passage_time_point[i][j] = np.array(passage_time_point[i][j], dtype=np.int64)
+
+        passage_time_length_every_traj.append(passage_time_length)
+        passage_time_point_every_traj.append(passage_time_point)
+
+    return passage_time_length_every_traj, passage_time_point_every_traj
+
 class Sf_model:
     """
-    This class is used to analyse the mechanism of a selectivity filter.
+    This is a class to analyse the mechanism of a selectivity filter.
     """
     def __init__(self, file_list=None, start=0, end=None, step=1, method="K_priority", lag_step=1, traj_dtype=np.int8):
         """
         This is the normal way to initialize a SF_model object. You can provide a list of output files from count_cylinder.py.
         :param file_list: file name or a list of file names. This should be the std_out from count_cylinder.py.
             If None, you can set everything later.
-        :param start: start frame, default is 0.
-        :param end: end frame, default is None (final).
+        :param start: starting frame. The default is 0.
+        :param end: end frame. The default is None (final).
         :param step: step frame, steps when reading trajectory, default is 1 (every frame).
         :param method: method to calculate the state, default is "K_priority".
             "K_priority", if there is a K in the binding site, letter K will be assigned.
             "Co-occupy", if there is a K and one or more water in the binding site, letter C will be assigned.
+            No other method is implemented.
         :param lag_step: lag step for calculating properties (transition matrix), default is 1.
+        :param traj_dtype: data type of the trajectory. default is np.int8.
         """
         # check arguments and initialize variables
         if file_list is None:
@@ -30,6 +77,8 @@ class Sf_model:
             self.file_list = [file_list]
         elif isinstance(file_list, list):
             self.file_list = file_list
+
+        # variables for raw trajectory
         self.time_step = 0    # time step between frames
         self.total_frame = 0  # total number of frames
         self.traj_raw = []    # raw trajectory, a list of np.array. not lumped
@@ -38,6 +87,7 @@ class Sf_model:
         self.state_Counter = None     # Counter of states(str)
         self.state_distribution = {}  # proportion of each state(str)
 
+        # variables for lumped trajectory
         self.traj_node = []           # lumped trajectory
         self.node_map_int_2_s = {}    # what does each node mean (in self.traj_lumped). key:int, value: list of str
         self.node_map_s_2_int = {}    # Which node does a state belong to (in self.traj_lumped). key:str, value: int
@@ -45,6 +95,7 @@ class Sf_model:
         self.node_distribution = {}   # proportion of each node, key is int
         self.node_distribution_str = {}  # proportion of each node, key is tuple of string
 
+        # variables for properties
         self.lag_step = lag_step  # lag step for computing properties
         self.flux_matrix = None
         self.flux_matrix_every_traj = None
@@ -52,10 +103,13 @@ class Sf_model:
         self.transition_probability_matrix_every_traj = None
         self.net_flux_matrix = None
         self.net_flux_matrix_every_traj = None
-        self.passage_time_point_every_traj = None
-        self.passage_time_length_every_traj = None
+        self.passage_time_point_every_traj = None   # lumped traj
+        self.passage_time_length_every_traj = None  # lumped traj
+        self.passage_time_length_every_traj_raw = None # raw traj
 
-        # read files
+        # initialization finished
+
+        # read file(s)
         if self.file_list is not None:
             time_step_list = []
             traj_tmp_list = []
@@ -67,8 +121,7 @@ class Sf_model:
                 raise ValueError("The time step between files are not the same.", str(time_step_list))
 
             self.set_traj_from_str(traj_tmp_list, time_step_list[0] * step, dtype=traj_dtype, dtype_lumped=traj_dtype)
-
-
+            self.calc_passage_time_raw()
 
     def set_traj_from_str(self, traj_list, time_step, dtype=np.int8, dtype_lumped=np.int8):
         """
@@ -206,6 +259,7 @@ class Sf_model:
         elif lag_step <= 0:
             raise ValueError("lag_step should be positive.")
         self.lag_step = lag_step
+
     def get_traj_in_string(self):
         """
         Get the trajectory in string format. To save memory, the state is represented by int in self.traj_raw.
@@ -287,37 +341,26 @@ class Sf_model:
 
     def calc_passage_time(self):
         """
-        Calculate the passage time. This function does not respond to self.lag_step.
-        :return:
+        Calculate the passage time from every node to every node. This function does not respond to self.lag_step.
+        :return: passage_time_length_every_traj
+            A list of matrix. One matrix for each traj.
+            matrix[i][j] is a list of passage time from node_i to node_j.
         """
-        passage_time_length_every_traj = []
-        passage_time_point_every_traj = []  # the time point when the passage finished
-        for traj in self.traj_node:
-            passage_time_length = []
-            passage_time_point = []
-            for i in range(len(self.node_map_int_2_s)):
-                passage_time_length.append([[] for _ in range(len(self.node_map_int_2_s))])
-                passage_time_point.append([[] for _ in range(len(self.node_map_int_2_s))])
-            starting_time = np.zeros((len(self.node_map_int_2_s), len(self.node_map_int_2_s)), dtype=np.int64) - 1
-            j = traj[0]
-            starting_time[j, :] = 0
-            for frame_i, (si, sj) in enumerate(zip(traj[:-1], traj[1:])):
-                if si != sj:
-                    for i, start_i in enumerate(starting_time[:, sj]):
-                        if start_i != -1 and i != sj:
-                            # successful passage from i to sj, from time start_i to frame_i+1
-                            passage_time_length[i][sj].append(frame_i+1 - start_i)
-                            passage_time_point[i][sj].append(frame_i+1)
-                            starting_time[i, sj] = -1
-                    starting_time[sj, :][starting_time[sj, :] == -1] = frame_i + 1
+        passage_time_len, passage_time_point = count_passage(self.traj_node, len(self.node_map_int_2_s))
+        self.passage_time_length_every_traj = passage_time_len
+        self.passage_time_point_every_traj = passage_time_point
+        return passage_time_len
 
-
-
-            passage_time_length_every_traj.append(passage_time_length)
-            passage_time_point_every_traj.append(passage_time_point)
-        self.passage_time_length_every_traj = passage_time_length_every_traj
-        self.passage_time_point_every_traj = passage_time_point_every_traj
-        return passage_time_length_every_traj
+    def calc_passage_time_raw(self):
+        """
+        Calculate the passage time from every state to every state on raw traj. This function does not respond to self.lag_step.
+        :return: passage_time_length_every_traj
+            A list of matrix. One matrix for each traj.
+            matrix[i][j] is a list of passage time from node_i to node_j.
+        """
+        passage_time_len, passage_time_point = count_passage(self.traj_raw, len(self.state_map_int_2_s))
+        self.passage_time_length_every_traj_raw = passage_time_len
+        return passage_time_len
 
     def get_time_step(self):
         """
@@ -344,21 +387,32 @@ class Sf_model:
         """
         return self.time_step * self.lag_step
 
-    def get_mfpt(self):
+    def get_mfpt(self, traj_type="lumped"):
         """
         compute and return the mfpt from self.passage_time_length_every_traj
+        :param traj_type: "lumped" or "raw"
         :return: mfpt, a np.array of size (n, n), mfpt from every node to every node.
                  mfpt_every_traj, mfpt for individual traj.
         """
-        if self.passage_time_length_every_traj is None:
-            warnings.warn("self.passage_time_length_every_traj is None. Calculating passage time.")
-            self.calc_passage_time()
+        if traj_type == "raw":
+            if self.passage_time_length_every_traj_raw is None:
+                warnings.warn("self.passage_time_length_every_traj_raw is None. Calculating passage time.")
+                self.calc_passage_time_raw()
+            passage_time = self.passage_time_length_every_traj_raw
+            node_num_length = len(self.state_map_int_2_s)
+        elif traj_type == "lumped":
+            if self.passage_time_length_every_traj is None:
+                warnings.warn("self.passage_time_length_every_traj is None. Calculating passage time.")
+                self.calc_passage_time()
+            passage_time = self.passage_time_length_every_traj
+            node_num_length = len(self.node_map_int_2_s)
+
         mfpt_every_traj = []
 
-        for passage_time_length in self.passage_time_length_every_traj:
-            mfpt_tmp = np.zeros((len(self.node_map_int_2_s), len(self.node_map_int_2_s)))
-            for i in range(len(self.node_map_int_2_s)):
-                for j in range(len(self.node_map_int_2_s)):
+        for passage_time_length in passage_time:
+            mfpt_tmp = np.zeros((node_num_length, node_num_length))
+            for i in range(node_num_length):
+                for j in range(node_num_length):
                     if i != j:
                         if len(passage_time_length[i][j]) == 0 :
                             mfpt_tmp[i, j] = np.nan
@@ -366,9 +420,9 @@ class Sf_model:
                             mfpt_tmp[i, j] = np.mean(passage_time_length[i][j]) * self.time_step
 
             mfpt_every_traj.append(mfpt_tmp)
-        mfpt = np.zeros((len(self.node_map_int_2_s), len(self.node_map_int_2_s)))
-        for i in range(len(self.node_map_int_2_s)):
-            for j in range(len(self.node_map_int_2_s)):
+        mfpt = np.zeros((node_num_length, node_num_length))
+        for i in range(node_num_length):
+            for j in range(node_num_length):
                 if i != j:
                     passage_list = [p_time for traj in self.passage_time_length_every_traj for p_time in traj[i][j] ]
                     if len(passage_list) == 0:
@@ -400,7 +454,6 @@ class Sf_model:
                         rate_tmp[i, j] = 1 / mfpt_tmp[i, j]
             rate_every_traj.append(rate_tmp)
         return rate, rate_every_traj
-
 
     def get_rate_passage_time(self):
         """

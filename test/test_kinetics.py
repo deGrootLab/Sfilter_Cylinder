@@ -5,7 +5,38 @@ from pathlib import Path
 from Sfilter import read_k_cylinder
 from numpy.testing import assert_allclose
 
+from Sfilter.util.kinetics import count_passage
+
+
+def assert_2d_int_arrays_equal(arrays1, arrays2):
+    """
+    Assert that two 2D lists of NumPy arrays are equal element-wise.
+
+    Parameters:
+    - arrays1: First 2D list of NumPy arrays.
+    - arrays2: Second 2D list of NumPy arrays.
+
+    Raises:
+    - AssertionError: If the arrays are not equal element-wise.
+    """
+    assert len(arrays1) == len(arrays2), "Number of rows must be the same."
+    for row1, row2 in zip(arrays1, arrays2):
+        assert len(row1) == len(row2), "Number of columns must be the same in each row."
+        for arr1, arr2 in zip(row1, row2):
+            np.testing.assert_array_equal(arr1, arr2)
+
 class MyTestCase(unittest.TestCase):
+    def test_assert_2d_int_arrays_equal(self):
+        print("#TESTING: assert_2d_int_arrays_equal, a helper function to assert 2d arrays equal")
+        arr1 = [[np.array([1, 2, 3]), np.array([4, 5, 6])],
+                [np.array([7, 8, 9]), np.array([10, 11, 12])]]
+        arr2 = [[np.array([1, 2, 3]), np.array([4, 5, 6])],
+                [np.array([7, 8, 9]), np.array([10, 11, 12])]]
+        arr3 = [[np.array([1, 2, 3]), np.array([4, 5, 6])],
+                [np.array([7, 8, 9]), np.array([10, 11, 13])]]
+        assert_2d_int_arrays_equal(arr1, arr2)
+        self.assertRaises(AssertionError, assert_2d_int_arrays_equal, arr1, arr3)
+
     def test_init(self):
         print("#TESTING: init. Init the Sf_model class in the normal way.")
         base = Path("04-output_wrapper/C_0.75_2ps/05-2ps")
@@ -169,6 +200,24 @@ class MyTestCase(unittest.TestCase):
         self.assertListEqual(k_model.net_flux_matrix.tolist(), [[0, 3],
                                                                 [-3, 0]])
 
+    def test_count_passage(self):
+        print("#TESTING: count_passage. This function count passage time from a list of trajectory.")
+        #                   0  1  2  3  4  5  6  7  8  9 10
+        traj_l = [np.array([0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0])]
+        ptime_len, ptime_point = count_passage(traj_l, 2)
+        answer = [
+            [[], [5, 1]],
+            [[3, 1], []],
+        ]
+        answer = [[[np.array(i) for i in j] for j in k] for k in answer]
+        assert_2d_int_arrays_equal(ptime_len[0], answer)
+        answer = [
+            [[], [5, 9]],
+            [[8, 10], []],
+        ]
+        answer = [[[np.array(i) for i in j] for j in k] for k in answer]
+        assert_2d_int_arrays_equal(ptime_point[0], answer)
+
     def test_calc_passage_time(self):
         print("TESTING: calc_passage_time.")
         traj_l = ["A A A A A B B B A B A".split(),
@@ -178,21 +227,30 @@ class MyTestCase(unittest.TestCase):
         k_model.set_traj_from_str(traj_l, time_step=1)
         k_model.calc_passage_time()
         passage_track_alltraj = k_model.passage_time_length_every_traj
-        self.assertListEqual(passage_track_alltraj[0], [
+        answer = [
             [[],     [5, 1], []],
             [[3, 1],     [], []],
             [[],         [], []]
-        ])
-        self.assertListEqual(passage_track_alltraj[1], [
+        ]
+        answer = [[[np.array(i) for i in j] for j in k] for k in answer]
+        assert_2d_int_arrays_equal(passage_track_alltraj[0], answer)
+
+        answer = [
             [[],     [2,1,1,1], [3,2,2]],
             [[2,2,2],       [], [1,1,1]],
             [[1,1,1],  [2,2,2],       []]
-        ])
-        self.assertListEqual(passage_track_alltraj[2], [
+        ]
+        answer = [[[np.array(i) for i in j] for j in k] for k in answer]
+        assert_2d_int_arrays_equal(passage_track_alltraj[1], answer)
+
+        answer = [
             [[],     [2,2,1,1], [3,3,2]],
             [[2,2,2],       [], [1,1,1]],
             [[1,1,1],  [3,2,2],       []]
-        ])
+        ]
+        answer = [[[np.array(i) for i in j] for j in k] for k in answer]
+        assert_2d_int_arrays_equal(passage_track_alltraj[2], answer)
+
         mfpt, mfpt_every_traj = k_model.get_mfpt()
         self.assertListEqual(mfpt.tolist(), [[0, 1.7, 2.5],
                                              [2, 0, 1],
