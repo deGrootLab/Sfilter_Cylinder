@@ -84,42 +84,47 @@ class MyTestCase(unittest.TestCase):
 
     def test_read_k_cylinder(self):
         print("# TESTING read_k_cylinder, see if we can read the correct 6 letter code and meta data")
-        s_list, meta_data, K_occupency, W_occupency = read_k_cylinder("04-output_wrapper/C_0.75_2ps/05-2ps/00"
-                                                                      "/analysis/04-state-code/k_cylinder.log")
-        self.assertListEqual(s_list[:3], ["WK0KKW", "WK0KKW", "WK0KKW"])
-        # meta_data
-        self.assertDictEqual(meta_data,
-                             {"time_step": 2.0, })
+        for get_occu in [True, False]:
+            s_list, meta_data, K_occupency, W_occupency = read_k_cylinder("04-output_wrapper/C_0.75_2ps/05-2ps/00"
+                                                                          "/analysis/04-state-code/k_cylinder.log",
+                                                                          get_occu=get_occu)
+            self.assertListEqual(s_list[:3], ["WK0KKW", "WK0KKW", "WK0KKW"])
+            # meta_data
+            self.assertDictEqual(meta_data,
+                                 {"time_step": 2.0, })
 
     def test_read_state_file_co_occupy(self):
         print("# TESTING read_k_cylinder, Co-occupy. 6 letter code contains K, W, and C")
-        s_list, meta_data, K_occupency, W_occupency = read_k_cylinder("04-output_wrapper/C_0.75_2ps/05-2ps/00"
-                                                                      "/analysis/04-state-code/k_cylinder.log",
-                                                                      method="Co-occupy")
-        self.assertListEqual(s_list[:3], ["WK0KKW", "WK0KKW", "WK0KKW"])
-        self.assertListEqual(s_list[405:408], ["WK0KKC", "WK0KKC", "WKK0KW"])
-        self.assertDictEqual(meta_data,
-                             {"time_step": 2.0, })
+        for get_occu in [True, False]:
+            s_list, meta_data, K_occupency, W_occupency = read_k_cylinder("04-output_wrapper/C_0.75_2ps/05-2ps/00"
+                                                                          "/analysis/04-state-code/k_cylinder.log",
+                                                                          method="Co-occupy",
+                                                                          get_occu=get_occu)
+            self.assertListEqual(s_list[:3], ["WK0KKW", "WK0KKW", "WK0KKW"])
+            self.assertListEqual(s_list[405:408], ["WK0KKC", "WK0KKC", "WKK0KW"])
+            self.assertDictEqual(meta_data,
+                                 {"time_step": 2.0, })
 
     def test_read_k_cylinder_list(self):
         print("# TESTING read_k_cylinder_list, read a sequence of k_cylinder.log files")
         f_list = ["04-output_wrapper/C_0.75_2ps/05-2ps/00/analysis/04-state-code/k_cylinder.log",
                   "04-output_wrapper/C_0.75_2ps/05-2ps/01/analysis/04-state-code/k_cylinder.log"
                   ]
-        s_list, meta_data, K_occupency, W_occupency = read_k_cylinder_list(f_list)
-        self.assertListEqual(s_list[:3], ["WK0KKW", "WK0KKW", "WK0KKW"])
-        self.assertEqual(len(s_list), 1001)
-        self.assertDictEqual(meta_data,
-                             {"time_step": 2.0, })
+        for get_occu in [False, True]:
+            s_list, meta_data, K_occupency, W_occupency = read_k_cylinder_list(f_list, get_occu=get_occu)
+            self.assertListEqual(s_list[:3], ["WK0KKW", "WK0KKW", "WK0KKW"])
+            self.assertEqual(len(s_list), 1001)
+            self.assertDictEqual(meta_data,
+                                 {"time_step": 2.0, })
         self.assertEqual(len(K_occupency), 1001)
-        self.assertListEqual(K_occupency[:3],
+        self.assertListEqual(K_occupency[:3].tolist(),
                              [
                                  [0, 1, 0, 1, 1, 0],
                                  [0, 1, 0, 1, 1, 0],
                                  [0, 1, 0, 1, 1, 0]
                              ])
         self.assertEqual(len(W_occupency), 1001)
-        self.assertListEqual(W_occupency[:3],
+        self.assertListEqual(W_occupency[:3].tolist(),
                              [
                                  [2, 0, 0, 0, 0, 15],
                                  [2, 0, 0, 0, 0, 14],
@@ -127,13 +132,13 @@ class MyTestCase(unittest.TestCase):
                              ])
 
         self.assertListEqual(s_list[500:503], ["WKK0KK", "KK0KKW", "KK0KKW"])
-        self.assertListEqual(K_occupency[500:503],
+        self.assertListEqual(K_occupency[500:503].tolist(),
                              [
                                  [0, 1, 1, 0, 1, 1],
                                  [1, 1, 0, 1, 1, 0],
                                  [1, 1, 0, 1, 1, 0]
                              ])
-        self.assertListEqual(W_occupency[500:503],
+        self.assertListEqual(W_occupency[500:503].tolist(),
                              [
                                  [2, 0, 0, 0, 0, 11],
                                  [0, 0, 0, 0, 0, 14],

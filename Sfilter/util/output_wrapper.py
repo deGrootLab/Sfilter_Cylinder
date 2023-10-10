@@ -245,19 +245,20 @@ def line_to_state(line):
     return state_str, n_pot, n_wat
 
 
-def read_k_cylinder(file, method="K_priority"):
+def read_k_cylinder(file, method="K_priority", get_occu=True):
     """
     read 1 output file from k_cylinder
     Args:
         file: output file from k_cylinder
         method: "K_priority" or "Co-occupy"
-        In "K_priority", if there is a K in the binding site, letter K will be assigned.
-        In "Co-occupy", if there is a K and one or more water in the binding site, letter C will be assigned.
+            In "K_priority", if there is a K in the binding site, letter K will be assigned.
+            In "Co-occupy", if there is a K and one or more water in the binding site, letter C will be assigned.
+        get_occu: if True, compute K_occupency and W_occupency for K and W occupency. otherwise, return empty list
     return:
         state_list, states string is a list
         meta_data, a dict
-        K_occupency, a list of K occupancy
-        W_occupency, a list of W occupancy
+        K_occupency, a np.array() of K occupancy
+        W_occupency, a np.array() of W occupancy
     """
     state_list = []
 
@@ -278,15 +279,16 @@ def read_k_cylinder(file, method="K_priority"):
                 l = lines[i]
                 if "# S6l" in l:
                     state_list.append(l.split()[-1])
-                    K_occupency.append([])
-                    W_occupency.append([])
-                    for j in range(1, 7):
-                        try:
-                            s_code, n_pot, n_wat = line_to_state(lines[i + j])
-                        except:
-                            raise ValueError(i+j, lines[i + j], "There is something wrong with this line")
-                        K_occupency[-1].append(n_pot)
-                        W_occupency[-1].append(n_wat)
+                    if get_occu:
+                        K_occ_tmp = np.zeros(6, dtype=np.int64)
+                        W_occ_tmp = np.zeros(6, dtype=np.int64)
+                        for j in range(1, 7):
+                            try:
+                                s_code, K_occ_tmp[j-1], W_occ_tmp[j-1] = line_to_state(lines[i + j])
+                            except:
+                                raise ValueError(i+j, lines[i + j], "There is something wrong with this line")
+                        K_occupency.append(K_occ_tmp)
+                        W_occupency.append(W_occ_tmp)
                     i += 6
                 else:
                     i += 1
@@ -302,22 +304,23 @@ def read_k_cylinder(file, method="K_priority"):
                 l = lines[i]
                 state_str = ""
                 if "# S6l" in l:
-                    K_occupency.append([])
-                    W_occupency.append([])
+                    K_occ_tmp = np.zeros(6, dtype=np.int64)
+                    W_occ_tmp = np.zeros(6, dtype=np.int64)
                     for j in range(1, 7):
-                        s_code, n_pot, n_wat = line_to_state(lines[i + j])
+                        s_code, K_occ_tmp[j-1], W_occ_tmp[j-1] = line_to_state(lines[i + j])
                         state_str += s_code
-                        K_occupency[-1].append(n_pot)
-                        W_occupency[-1].append(n_wat)
                     state_list.append(state_str)
                     i += 6
+                    if get_occu:
+                        K_occupency.append(K_occ_tmp)
+                        W_occupency.append(W_occ_tmp)
                 else:
                     i += 1
         else:
             raise ValueError("method should be K_priority or Co-occupy")
-    return state_list, meta_data, K_occupency, W_occupency
+    return state_list, meta_data, np.array(K_occupency), np.array(W_occupency)
 
-def read_k_cylinder_list(file_list, method="K_priority"):
+def read_k_cylinder_list(file_list, method="K_priority", get_occu=True):
     """
     read a list of output file from k_cylinder
     This is designed for reading a sequence of MD simulation that can be concatenated together.
@@ -336,23 +339,25 @@ def read_k_cylinder_list(file_list, method="K_priority"):
     """
     # if file_list is a str, read file using read_k_cylinder, otherwise, read files one by one
     if isinstance(file_list, str) or isinstance(file_list, Path):
-        state_list, meta_data, K_occupency, W_occupency = read_k_cylinder(file_list, method)
+        state_list, meta_data, K_occupency, W_occupency = read_k_cylinder(file_list, method, get_occu)
     elif isinstance(file_list, list):
         # make sure file exists
         for f in file_list:
             if not Path(f).exists():
                 raise FileNotFoundError(f)
         if len(file_list) == 1:
-            state_list, meta_data, K_occupency, W_occupency = read_k_cylinder(file_list[0], method)
+            state_list, meta_data, K_occupency, W_occupency = read_k_cylinder(file_list[0], method, get_occu)
         else:
-            state_list, meta_data, K_occupency, W_occupency = read_k_cylinder(file_list[0], method)
+            state_list, meta_data, K_occupency, W_occupency = read_k_cylinder(file_list[0], method, get_occu)
             for f in file_list[1:]:
-                s_list_tmp, meta_data_tmp, K_occu_tmp, W_occu_tmp = read_k_cylinder(f, method)
+                s_list_tmp, meta_data_tmp, K_occu_tmp, W_occu_tmp = read_k_cylinder(f, method, get_occu)
                 state_list.extend(s_list_tmp[1:])
                 if meta_data_tmp != meta_data:
                     raise ValueError("meta_data is different in different files. Please check " + str(f))
-                K_occupency.extend(K_occu_tmp[1:])
-                W_occupency.extend(W_occu_tmp[1:])
+                # K_occupency.extend(K_occu_tmp[1:])
+                # W_occupency.extend(W_occu_tmp[1:])
+                K_occupency = np.concatenate((K_occupency, K_occu_tmp[1:]))
+                W_occupency = np.concatenate((W_occupency, W_occu_tmp[1:]))
     else:
         raise TypeError("file_list must be a str or a list of str")
 
