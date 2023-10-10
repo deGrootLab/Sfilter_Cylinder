@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from .output_wrapper import read_k_cylinder
 from collections import Counter
-
+import gc
 
 def count_passage(traj_list, num_of_node):
     """
@@ -113,14 +113,31 @@ class Sf_model:
         if self.file_list is not None:
             time_step_list = []
             traj_tmp_list = []
-            for traj, meta_data, K_occupency, W_occupency in [read_k_cylinder(file, method) for file in file_list]:
+            map_s_2_int = {}
+            map_int_2_s = {}
+            state_index = 0
+            for file in self.file_list:
+                traj, meta_data, K_occupency, W_occupency = read_k_cylinder(file, method, get_occu=False)
                 time_step_list.append(meta_data["time_step"])
-                traj_tmp_list.append(traj[start:end:step])
+                unique_state = sorted(set(traj))
+                for s in unique_state:
+                    if s not in map_s_2_int:
+                        map_s_2_int[s] = state_index
+                        map_int_2_s[state_index] = s
+                        state_index += 1
+                traj = traj[start:end:step]
+                traj_int = np.array([map_s_2_int[s] for s in traj], dtype=traj_dtype)
+                traj_tmp_list.append(traj_int)
+                del traj  # free memory
+                del K_occupency
+                del W_occupency
+                gc.collect()
             # check if time step (float) is almost the same
             if not np.allclose(time_step_list, time_step_list[0]):
                 raise ValueError("The time step between files are not the same.", str(time_step_list))
 
-            self.set_traj_from_str(traj_tmp_list, time_step_list[0] * step, dtype=traj_dtype, dtype_lumped=traj_dtype)
+            self.set_traj_from_int(traj_tmp_list, time_step_list[0] * step, map_int_2_s, dtype_lumped=traj_dtype)
+            # self.set_traj_from_str(traj_tmp_list, time_step_list[0] * step, dtype=traj_dtype, dtype_lumped=traj_dtype)
             # self.calc_passage_time_raw()
 
     def set_traj_from_str(self, traj_list, time_step, dtype=np.int8, dtype_lumped=np.int8):
@@ -162,14 +179,47 @@ class Sf_model:
         # self.passage_time_point_every_traj,
         # self.passage_time_length_every_traj
 
-    def set_traj_from_int(self, traj_list, time_step):
+    def set_traj_from_int(self, traj_list, time_step, map_int_2_s, dtype=np.int8, dtype_lumped=np.int8):
         """
         Set the trajectory from lists of int.
-        :param traj_list: a list of traj. Each traj is a sequence of int.
+        :param traj_list: a list of np.array(). Each np.array() is a sequence of int.
         :param time_step: time step between frames.
+        :param map_int_2_s: map from int to state (str).
+        :param dtype: data type of the trajectory. default is np.int8.
+        :param dtype_lumped: data type of the lumped trajectory. default is np.int8.
         :return: None
         """
-        pass
+        if dtype not in [np.int8, np.int16, np.int32, np.int64]:
+            raise ValueError("dtype should be np.int8, np.int16, np.int32, np.int64.")
+        if dtype_lumped not in [np.int8, np.int16, np.int32, np.int64]:
+            raise ValueError("dtype_lumped should be np.int8, np.int16, np.int32, np.int64.")
+
+        self.time_step = time_step
+        Counter_tmp = Counter([])
+        for traj in traj_list:
+            Counter_tmp.update(traj)
+
+        self.state_Counter = Counter([])
+        self.total_frame = Counter_tmp.total()
+        map_old_2_new = {}
+        for i_new, (i_old, n) in enumerate(Counter_tmp.most_common()):
+            self.state_Counter[map_int_2_s[i_old]] = n
+            self.state_distribution[map_int_2_s[i_old]] = n / self.total_frame
+            self.state_map_int_2_s[i_new] = map_int_2_s[i_old]
+            self.state_map_s_2_int[map_int_2_s[i_old]] = i_new
+            self.node_map_int_2_s[i_new] = [map_int_2_s[i_old]]
+            self.node_map_s_2_int[map_int_2_s[i_old]] = i_new
+            map_old_2_new[i_old] = i_new
+        # update traj_list
+        self.traj_raw = []
+        for traj in traj_list:
+            self.traj_raw.append(np.array([map_old_2_new[i] for i in traj], dtype=dtype))
+
+        self.set_lumping_from_str([], dtype_lumped)  # At the end of this function, properties will be calculated.
+        self.calc_passage_time_raw()
+
+
+
 
     def set_lumping_from_str(self, lumping_list, dtype=np.int8):
         """
@@ -277,7 +327,7 @@ class Sf_model:
         num_of_node = len(self.node_map_int_2_s)
         flux_matrix_alltraj = []
         for traj in self.traj_node:
-            flux_matrix_tmp = np.zeros((num_of_node, num_of_node))
+            flux_matrix_tmp = np.zeros((num_of_node, num_of_node), dtype=np.int64)
             node_start = traj[             :-self.lag_step]
             node_end   = traj[self.lag_step:              ]
             for i in range(num_of_node):
@@ -325,13 +375,13 @@ class Sf_model:
         if self.flux_matrix is None or self.flux_matrix_every_traj is None:
             self.calc_flux_matrix()
         num_of_node = len(self.node_map_int_2_s)
-        net_flux_matrix = np.zeros((num_of_node, num_of_node))
+        net_flux_matrix = np.zeros((num_of_node, num_of_node), dtype=np.int64)
         for i in range(num_of_node):
             for j in range(i+1, num_of_node):
                 net_flux_matrix[i, j] = self.flux_matrix[i, j] - self.flux_matrix[j, i]
                 net_flux_matrix[j, i] = -net_flux_matrix[i, j]
         self.net_flux_matrix = net_flux_matrix
-        self.net_flux_matrix_every_traj = np.zeros((len(self.flux_matrix_every_traj), num_of_node, num_of_node))
+        self.net_flux_matrix_every_traj = np.zeros((len(self.flux_matrix_every_traj), num_of_node, num_of_node), dtype=np.int64)
         for traj_i, flux_i in enumerate(self.flux_matrix_every_traj):
             for i in range(num_of_node):
                 for j in range(i+1, num_of_node):
