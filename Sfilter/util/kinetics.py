@@ -864,19 +864,12 @@ class Mechanism_Graph:
         label_dict = {i: label_function(i, **kwargs) for i in self.G.nodes}
         nx.set_node_attributes(self.G, label_dict, "label")
 
-    def draw_dirty(self, ax, node_list=None, node_size_range=((0.01, 0.3), (30, 900)), edge_width=None, net_flux_cutoff=10,
+    def draw_dirty(self, ax, node_list=None, node_size_range=((0.01, 0.3), (30, 900)), edge_width=None,
+                   net_flux_cutoff=10,
                    node_alpha=0.7, edge_alpha=0.5, add_index=True,
                    spring_iterations=5, spring_k=10, pos=None,
                    label_bbox=None):
         """
-
-        :param ax: matplotlib.axes
-        :param node_size_range: ((min_proportion, max_proportion),(min_size, max_size)), default ((0.01, 0.3), (0.1, 1))
-        :param edge_width: ((min_rate, max_rate),(min_width, max_width)), default None.
-        :param pos: position, a dictionary from node index to position.
-            If not given, use nx.spring_layout to guess the initial position.
-        :param label_bbox: a dictionary, the bbox for edge label
-        :return: position, a dictionary from node index to position
         """
         if label_bbox is None:
             label_bbox = {"boxstyle": "round", "ec": (1.0, 1.0, 1.0, 0), "fc": (1.0, 1.0, 1.0, 0.5)}
@@ -887,17 +880,18 @@ class Mechanism_Graph:
             for i in self.G.nodes:
                 if np.any(self.net_flux[i, :] > net_flux_cutoff) or np.any(self.net_flux[:, i] > net_flux_cutoff):
                     node_list.append(i)
+        sub_G = self.G.subgraph(node_list)
         # 2 spring_layout
         # get a subgraph and spring_layout
         if pos is None:
-            sub_G = self.G.subgraph(node_list)
             pos_init_all = self.guess_init_position()
             pos = nx.spring_layout(sub_G, iterations=spring_iterations, k=spring_k,
                                    pos={i: pos_init_all[i] for i in node_list})
         # 3 node size based on distribution
         self.set_node_label(add_index=add_index)
         ((min_p, max_p), (min_size, max_size)) = node_size_range
-        size_dict = {i: min_size + (max_size - min_size) * (self.node_distribution[i] - min_p) / (max_p - min_p) for i in self.G.nodes}
+        size_dict = {i: min_size + (max_size - min_size) * (self.node_distribution[i] - min_p) / (max_p - min_p) for i
+                     in self.G.nodes}
         # color
         color_list = []
         for node in sub_G:
@@ -927,22 +921,26 @@ class Mechanism_Graph:
                     edge_rate.append(d["rate_ij"])
         # rescale edge_width
         if edge_width is None:
-            edge_width = ((min(edge_rate), max(edge_rate)),(0.02, 3))
+            edge_width = ((min(edge_rate), max(edge_rate)), (0.05, 10))
         ((min_rate, max_rate), (min_width, max_width)) = edge_width
-        width_list = [min_width + (max_width - min_width) * (rate - min_rate) / (max_rate - min_rate) for rate in edge_rate]
+        width_list = [min_width + (max_width - min_width) * (rate - min_rate) / (max_rate - min_rate) for rate in
+                      edge_rate]
         nx.draw_networkx_edges(sub_G, ax=ax, pos=pos, edgelist=edge_list, width=width_list, alpha=edge_alpha,
-                               connectionstyle='arc3,rad=0.05',)
+                               connectionstyle='arc3,rad=0.05', )
         nx.draw_networkx_edge_labels(sub_G, ax=ax, pos=pos, edge_labels=edge_label, bbox=label_bbox)
-
 
         # return
         # node_list
-        # 1 print node distribution (maximum missing state)
         # 2 print rate distribution
         # 3 pos (for further refine)
+        return node_list, pos, sub_G, edge_width
 
-        if edge_width is None:
-            pass
+    def plot_grid(self, ax):
+        xmin, xmax = ax.get_xlim()
+        ymin, ymax = ax.get_ylim()
+        ax.set_xticks(np.arange(round(xmin, 1), round(xmax, 1), 0.1))
+        ax.set_yticks(np.arange(round(ymin, 1), round(ymax, 1), 0.1))
+        ax.grid()
 
 
 
