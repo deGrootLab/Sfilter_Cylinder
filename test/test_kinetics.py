@@ -1,3 +1,4 @@
+import time
 import unittest
 import numpy as np
 from Sfilter import kinetics
@@ -379,6 +380,7 @@ class MyTestCase(unittest.TestCase):
         k_model = kinetics.Sf_model()
         k_model.set_traj_from_str(traj, time_step=1)
         # Test if the graph is correct
+        k_model.build_graph()
         self.assertListEqual(list(k_model.mechanism_G.G.nodes), [0, 1, 2, 3])
         self.assertDictEqual(k_model.state_map_int_2_s, {0: "K0KK0", 1: "WK0K0", 2: "WK0KK", 3: "WKK0K"})
         self.assertDictEqual(k_model.state_map_s_2_int, {"K0KK0": 0, "WK0K0": 1, "WK0KK": 2, "WKK0K": 3})
@@ -401,6 +403,24 @@ class MyTestCase(unittest.TestCase):
             'flux_ij': 5,
             'flux_ji': 1,
             'net_flux': 4})
+
+    def test_performance(self):
+        print("# TEST Speed")
+        base = Path("/home/cheng/E29Project-2023-04-11/054-NaK2K/02-Charmm_scale_R/06-C_0.75/07-.1ps/")
+        if base.is_dir():
+            print("Run speed test")
+            file_list = [base / f"{i:02}/analysis/08-02-1.8A/k_cylinder.log" for i in range(10)]
+            k_model = kinetics.Sf_model(file_list, print_time=True)
+            # t0 = time.time()
+            # k_model._init_raw_properties()
+            # t1 = time.time()
+            # print(f"Init raw properties: {t1 - t0:.2f} s")
+            # k_model.calc_passage_time()
+            # t2 = time.time()
+            # print(f"calc passage : {t2 - t1:.2f} s")
+
+        else:
+            print("Data not found, skip speed test")
 
 
 if __name__ == '__main__':
