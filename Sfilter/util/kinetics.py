@@ -66,7 +66,7 @@ class Sf_model:
     This is a class to analyse the mechanism of a selectivity filter.
     """
 
-    def __init__(self, file_list=None, start=0, end=None, step=1, method="K_priority", lag_step=1, traj_dtype=np.int8):
+    def __init__(self, file_list=None, start=0, end=None, step=1, method="K_priority", lag_step=1, traj_dtype=np.int16):
         """
         This is the normal way to initialize a SF_model object. You can provide a list of output files from count_cylinder.py.
         :param file_list: file name or a list of file names. This should be the std_out from count_cylinder.py.
@@ -132,6 +132,7 @@ class Sf_model:
             map_int_2_s = {}
             state_index = 0
             for file in self.file_list:
+                print(file)
                 traj, meta_data, K_occupency, W_occupency = read_k_cylinder(file, method, get_occu=False)
                 time_step_list.append(meta_data["time_step"])
                 unique_state = sorted(set(traj))
@@ -153,7 +154,7 @@ class Sf_model:
 
             self.set_traj_from_int(traj_tmp_list, time_step_list[0] * step, map_int_2_s, dtype_lumped=traj_dtype)
 
-    def _init_raw_properties(self, dtype_lumped=np.int8):
+    def _init_raw_properties(self, dtype_lumped=np.int16):
         self.set_lumping_from_str([], dtype_lumped, calc_passage_time=True,
                                   build_graph=False)  # At the end of this function, properties will be calculated.
         self.flux_raw = self.calc_flux_matrix()
@@ -203,12 +204,12 @@ class Sf_model:
         self.raw_traj_df["rate_AB_x_rate_BA"] = self.raw_traj_df["rate_AB"] * self.raw_traj_df["rate_BA"]
         self.build_graph()
 
-    def set_traj_from_str(self, traj_list, time_step, dtype=np.int8, dtype_lumped=np.int8):
+    def set_traj_from_str(self, traj_list, time_step, dtype=np.int16, dtype_lumped=np.int16):
         """
         Set the trajectory from lists of string.
         :param traj_list: a list of traj. Each traj is a sequence of str.
         :param time_step: time step between frames.
-        :param dtype: data type of the trajectory. default is np.int8.
+        :param dtype: data type of the trajectory. default is np.int16.
         :return: None
         """
         if dtype not in [np.int8, np.int16, np.int32, np.int64]:
@@ -232,14 +233,14 @@ class Sf_model:
 
         self._init_raw_properties(dtype_lumped=dtype_lumped)
 
-    def set_traj_from_int(self, traj_list, time_step, map_int_2_s, dtype=np.int8, dtype_lumped=np.int8):
+    def set_traj_from_int(self, traj_list, time_step, map_int_2_s, dtype=np.int16, dtype_lumped=np.int16):
         """
         Set the trajectory from lists of int.
         :param traj_list: a list of np.array(). Each np.array() is a sequence of int.
         :param time_step: time step between frames.
         :param map_int_2_s: map from int to state (str).
-        :param dtype: data type of the trajectory. default is np.int8.
-        :param dtype_lumped: data type of the lumped trajectory. default is np.int8.
+        :param dtype: data type of the trajectory. default is np.int16.
+        :param dtype_lumped: data type of the lumped trajectory. default is np.int16.
         :return: None
         """
         if dtype not in [np.int8, np.int16, np.int32, np.int64]:
@@ -270,11 +271,11 @@ class Sf_model:
 
         self._init_raw_properties(dtype_lumped=dtype_lumped)
 
-    def set_lumping_from_str(self, lumping_list, dtype=np.int8, calc_passage_time=False, letter=6, build_graph=True):
+    def set_lumping_from_str(self, lumping_list, dtype=np.int16, calc_passage_time=False, letter=6, build_graph=True):
         """
         Set the lumping from lists of string. such as [("A", "B"), ("C", "D")].
         :param lumping_list: a list of lumping. Each lumping is a list of str. There should be no repeated states in lumping_list.
-        :param dtype: data type of the trajectory. default is np.int8.
+        :param dtype: data type of the trajectory. default is np.int16.
         :param calc_passage_time: whether to calculate the passage time. default is False.
         :param letter: number of letters in the state. default is 6. 6 : S0-S5, 5 : S0-S4, 4 : S1-S4
         Those variables will be updated:
