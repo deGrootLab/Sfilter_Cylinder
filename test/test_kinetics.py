@@ -6,7 +6,6 @@ from pathlib import Path
 from Sfilter import read_k_cylinder
 from numpy.testing import assert_allclose
 
-from Sfilter.util.kinetics import count_passage
 
 
 def assert_2d_int_arrays_equal(arrays1, arrays2):
@@ -197,22 +196,28 @@ class MyTestCase(unittest.TestCase):
                                                                 [-3, 0]])
 
     def test_count_passage(self):
-        print("#TESTING: count_passage. This function count passage time from a list of trajectory.")
-        #                   0  1  2  3  4  5  6  7  8  9 10
-        traj_l = [np.array([0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0])]
-        ptime_len, ptime_point = count_passage(traj_l, 2)
-        answer = [
-            [[], [5, 1]],
-            [[3, 1], []],
-        ]
-        answer = [[[np.array(i) for i in j] for j in k] for k in answer]
-        assert_2d_int_arrays_equal(ptime_len[0], answer)
-        answer = [
-            [[], [5, 9]],
-            [[8, 10], []],
-        ]
-        answer = [[[np.array(i) for i in j] for j in k] for k in answer]
-        assert_2d_int_arrays_equal(ptime_point[0], answer)
+        print("#TESTING: count_passage_single_traj/count_passage. This function count passage time from a list of trajectory.")
+        #                  0  1  2  3  4  5  6  7  8  9 10
+        traj_s = np.array([0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0])
+        traj_l = [traj_s]
+
+        ptime_len_s, ptime_point_s = kinetics.count_passage_single_traj(traj_s, 2)
+        ptime_len_l, ptime_point_l = kinetics.count_passage(traj_l, 2)
+
+        for ptime_len, ptime_point in ((ptime_len_l, ptime_point_l),
+                                       ([ptime_len_s], [ptime_point_s])):
+            answer = [
+                [[], [5, 1]],
+                [[3, 1], []],
+            ]
+            answer = [[[np.array(i) for i in j] for j in k] for k in answer]
+            assert_2d_int_arrays_equal(ptime_len[0], answer)
+            answer = [
+                [[], [5, 9]],
+                [[8, 10], []],
+            ]
+            answer = [[[np.array(i) for i in j] for j in k] for k in answer]
+            assert_2d_int_arrays_equal(ptime_point[0], answer)
 
     def test_calc_passage_time(self):
         print("#TESTING: calc_passage_time.")
@@ -406,10 +411,10 @@ class MyTestCase(unittest.TestCase):
 
     def test_performance(self):
         print("# TEST Speed")
-        base = Path("/home/cheng/E29Project-2023-04-11/054-NaK2K/02-Charmm_scale_R/06-C_0.75/07-.1ps/")
+        base = Path.home()/"E29Project-2023-04-11/054-NaK2K/02-Charmm_scale_R/06-C_0.75/07-.1ps/"
         if base.is_dir():
             print("Run speed test")
-            file_list = [base / f"{i:02}/analysis/08-02-1.8A/k_cylinder.log" for i in range(10)]
+            file_list = [base / f"{i:02}/analysis/08-02-1.8A/k_cylinder.log" for i in range(4)]
             k_model = kinetics.Sf_model(file_list, print_time=True)
             # t0 = time.time()
             # k_model._init_raw_properties()

@@ -9,8 +9,46 @@ import gc
 import networkx as nx
 import matplotlib.pyplot as plt
 import time
+from concurrent.futures import ProcessPoolExecutor
 
-def count_passage(traj_list, num_of_node, print_progress=False):
+
+# inorder to run count_passage in parallel, we need to define a function count_passage_single_traj that process a single traj.
+def count_passage_single_traj(traj, num_of_node):
+    """
+    Count the passage on a single trajectory.
+    :param traj: a np.array of int.
+    :param num_of_node: number of nodes. Assume the nodes are 0, 1, 2, ..., num_of_node-1.
+    :return: (passage_time_length, passage_time_point)
+        passage_time_length, a matrix. passage_time_length[i][j] is a np.array of passage time(unit in step)
+        passage_time_point, a matrix. passage_time_point[i][j] is a np.array of passage finishing time (unit in step)
+    """
+    passage_time_length = []
+    passage_time_point = []
+    for i in range(num_of_node):
+        passage_time_length.append([[] for _ in range(num_of_node)])  # length of each passage
+        passage_time_point.append([[] for _ in range(num_of_node)])   # finishing time of each passage
+    starting_time = np.zeros((num_of_node, num_of_node), dtype=np.int64) - 1
+    j = traj[0]
+    starting_time[j, :] = 0
+    for frame_i, (si, sj) in enumerate(zip(traj[:-1], traj[1:])):
+        if si != sj:
+            for i, start_i in enumerate(starting_time[:, sj]):
+                if start_i != -1 and i != sj:
+                    # successful passage from i to sj, from time start_i to frame_i+1
+                    passage_time_length[i][sj].append(frame_i + 1 - start_i)
+                    passage_time_point[i][sj].append(frame_i + 1)
+                    starting_time[i, sj] = -1
+            starting_time[sj, :][starting_time[sj, :] == -1] = frame_i + 1
+
+    # Convert list to numpy array to save memory
+    for i in range(num_of_node):
+        for j in range(num_of_node):
+            passage_time_length[i][j] = np.array(passage_time_length[i][j], dtype=np.int64)
+            passage_time_point[i][j] = np.array(passage_time_point[i][j], dtype=np.int64)
+
+    return passage_time_length, passage_time_point
+
+def count_passage(traj_list, num_of_node, num_workers=None):
     """
     Count the passage on a list of trajectory.
     :param traj_list: A list of trajectory. Each trajectory is a list(np.array) of int.
@@ -24,40 +62,18 @@ def count_passage(traj_list, num_of_node, print_progress=False):
             when the passage from node_i to node_j finished .
     """
     passage_time_length_every_traj = []
-    passage_time_point_every_traj = []  # the time point when the passage finished
-    traj_count = 0
-    for traj in traj_list:
-        if print_progress:
-            traj_count += 1
-            print(f"{traj_count}/{len(traj_list)}", end=" ")
-        passage_time_length = []
-        passage_time_point = []
-        for i in range(num_of_node):
-            passage_time_length.append([[] for _ in range(num_of_node)])
-            passage_time_point.append([[] for _ in range(num_of_node)])
-        starting_time = np.zeros((num_of_node, num_of_node), dtype=np.int64) - 1
-        j = traj[0]
-        starting_time[j, :] = 0
-        for frame_i, (si, sj) in enumerate(zip(traj[:-1], traj[1:])):
-            if si != sj:
-                for i, start_i in enumerate(starting_time[:, sj]):
-                    if start_i != -1 and i != sj:
-                        # successful passage from i to sj, from time start_i to frame_i+1
-                        passage_time_length[i][sj].append(frame_i + 1 - start_i)
-                        passage_time_point[i][sj].append(frame_i + 1)
-                        starting_time[i, sj] = -1
-                starting_time[sj, :][starting_time[sj, :] == -1] = frame_i + 1
+    passage_time_point_every_traj = []
 
-        # Convert list to numpy array to save memory
-        for i in range(num_of_node):
-            for j in range(num_of_node):
-                passage_time_length[i][j] = np.array(passage_time_length[i][j], dtype=np.int64)
-                passage_time_point[i][j] = np.array(passage_time_point[i][j], dtype=np.int64)
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        futures = []
+        for traj in traj_list:
+            future = executor.submit(count_passage_single_traj, traj, num_of_node)
+            futures.append(future)
 
-        passage_time_length_every_traj.append(passage_time_length)
-        passage_time_point_every_traj.append(passage_time_point)
-    if print_progress:
-        print()
+        for future in futures:
+            passage_time_length, passage_time_point = future.result()
+            passage_time_length_every_traj.append(passage_time_length)
+            passage_time_point_every_traj.append(passage_time_point)
 
     return passage_time_length_every_traj, passage_time_point_every_traj
 
@@ -166,7 +182,6 @@ class Sf_model:
                 print("set lumped traj        (s):", t3 - t2)
                 print("compute raw properties (s):", t4 - t3)
 
-
     def set_traj_from_str(self, traj_list, time_step, dtype=np.int16, dtype_lumped=np.int16, init_raw_properties=True):
         """
         Set the trajectory from lists of string.
@@ -237,12 +252,17 @@ class Sf_model:
             self._init_raw_properties(dtype_lumped=dtype_lumped)
 
     def _init_raw_properties(self, dtype_lumped=np.int16):
+        t0 = time.time()
         self.set_lumping_from_str([], dtype_lumped, calc_passage_time=False)  # At the end of this function, properties will be calculated.
+        t1 = time.time()
+        print("Inside '_init_raw_properties', set_lumping_from_str    (s):", t1 - t0)
         self.flux_raw = copy.deepcopy(self.flux_matrix)
         self.net_flux_raw = copy.deepcopy(self.net_flux_matrix)
         self.calc_passage_time()
         self.passage_time_length_every_traj_raw = copy.deepcopy(self.passage_time_length_every_traj)
         self.rate_raw, _ = self.get_rate_passage_time(traj_type="raw")
+        t2 = time.time()
+        print("Inside '_init_raw_properties', calc_passage_time       (s):", t2 - t1)
 
         # build a DataFrame for the raw traj
         index_A = []
@@ -469,8 +489,7 @@ class Sf_model:
             A list of matrix. One matrix for each traj.
             matrix[i][j] is a list of passage time from node_i to node_j.
         """
-        passage_time_len, passage_time_point = count_passage(self.traj_raw, len(self.state_map_int_2_s),
-                                                             print_progress=True)
+        passage_time_len, passage_time_point = count_passage(self.traj_raw, len(self.state_map_int_2_s))
         self.passage_time_length_every_traj_raw = passage_time_len
         return passage_time_len
 
