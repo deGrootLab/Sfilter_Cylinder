@@ -64,6 +64,7 @@ def count_passage(traj_list, num_of_node, num_workers=None):
     passage_time_length_every_traj = []
     passage_time_point_every_traj = []
 
+    # if num_workers is None, it will use the number of logical CPUs
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
         futures = []
         for traj in traj_list:
@@ -150,7 +151,6 @@ class Sf_model:
             map_s_2_int = {}
             map_int_2_s = {}
             state_index = 0
-            t1 = time.time()
             for file in self.file_list:
                 print(file)
                 traj, meta_data, K_occupency, W_occupency = read_k_cylinder(file, method, get_occu=False)
@@ -178,7 +178,7 @@ class Sf_model:
             self._init_raw_properties(dtype_lumped=traj_dtype)
             t4 = time.time()
             if print_time:
-                print("load files             (s):", t2 - t1)
+                print("load files             (s):", t2 - t0)
                 print("set lumped traj        (s):", t3 - t2)
                 print("compute raw properties (s):", t4 - t3)
 
@@ -252,17 +252,12 @@ class Sf_model:
             self._init_raw_properties(dtype_lumped=dtype_lumped)
 
     def _init_raw_properties(self, dtype_lumped=np.int16):
-        t0 = time.time()
         self.set_lumping_from_str([], dtype_lumped, calc_passage_time=False)  # At the end of this function, properties will be calculated.
-        t1 = time.time()
-        print("Inside '_init_raw_properties', set_lumping_from_str    (s):", t1 - t0)
         self.flux_raw = copy.deepcopy(self.flux_matrix)
         self.net_flux_raw = copy.deepcopy(self.net_flux_matrix)
         self.calc_passage_time()
         self.passage_time_length_every_traj_raw = copy.deepcopy(self.passage_time_length_every_traj)
         self.rate_raw, _ = self.get_rate_passage_time(traj_type="raw")
-        t2 = time.time()
-        print("Inside '_init_raw_properties', calc_passage_time       (s):", t2 - t1)
 
         # build a DataFrame for the raw traj
         index_A = []

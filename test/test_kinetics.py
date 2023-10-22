@@ -260,6 +260,18 @@ class MyTestCase(unittest.TestCase):
                                              [2., 0., np.nan],
                                              [np.nan, np.nan, 0.]], equal_nan=True)
 
+    def test_calc_flux_matrix(self):
+        print("#TESTING: calc_flux_matrix.")
+        traj_l = ["A A A A A B B B A B A".split(),
+                  "A A B C A B C A B C A B".split()]
+        k_model = kinetics.Sf_model()
+        k_model.set_traj_from_str(traj_l, time_step=1)
+        self.assertListEqual(k_model.flux_matrix.tolist(),
+                             [[5, 6, 0], [2, 2, 3], [3, 0, 0]])
+        self.assertListEqual(k_model.flux_matrix_every_traj[0].tolist(), [[4, 2, 0], [2, 2, 0], [0, 0, 0]])
+        self.assertListEqual(k_model.flux_matrix_every_traj[1].tolist(), [[1, 4, 0], [0, 0, 3], [3, 0, 0]])
+
+
     def test_get_rate_inverse_mfpt(self):
         print("#TESTING: get_rate_inverse_mfpt. This function calculate the rate from every node to every node")
         traj_l = ["A A B A A B A A B A".split(),
@@ -416,13 +428,6 @@ class MyTestCase(unittest.TestCase):
             print("Run speed test")
             file_list = [base / f"{i:02}/analysis/08-02-1.8A/k_cylinder.log" for i in range(4)]
             k_model = kinetics.Sf_model(file_list, print_time=True)
-            # t0 = time.time()
-            # k_model._init_raw_properties()
-            # t1 = time.time()
-            # print(f"Init raw properties: {t1 - t0:.2f} s")
-            # k_model.calc_passage_time()
-            # t2 = time.time()
-            # print(f"calc passage : {t2 - t1:.2f} s")
 
         else:
             print("Data not found, skip speed test")
