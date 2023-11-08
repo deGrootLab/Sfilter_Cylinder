@@ -389,7 +389,9 @@ class Cylinder_output:
         data_list = []
         for f in self.files:
             data_list.append(read_k_cylinder(f, method))
-        for s_list, meta_data, K_occupency, W_occupency in [read_k_cylinder(f, method) for f in self.files]:
+        for f in self.files:
+            s_list, meta_data, K_occu, W_occu = read_k_cylinder(f, method, get_occu=False)
+        # for s_list, meta_data, K_occu, W_occu in [read_k_cylinder(f, method, get_occu=False) for f in self.files]:
             self.state_str.append(s_list[start:end:step])
             if time_step is None:
                 if "time_step" not in meta_data:
