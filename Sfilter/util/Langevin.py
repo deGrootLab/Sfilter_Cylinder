@@ -66,13 +66,8 @@ def baoab(potential, max_steps, dt, gamma, kBT, initial_position, initial_veloci
         v = velocity_update(v, force, dt)
 
         if step_number % save_frequency == 0 and step_number > 0:
-            kinetic = .5 * v * v
-            e_total = kinetic + potential_E
-
             positions.append(x)
-            # velocities.append(v)
-            # potential_energies.append(potential_E)
-            # save_times.append(t)
+
 
         t = t + dt
         step_number = step_number + 1
