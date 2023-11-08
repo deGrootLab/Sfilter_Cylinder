@@ -5,6 +5,7 @@ from scipy.stats import sem
 from scipy.stats import gaussian_kde
 from scipy.stats import bootstrap
 from collections import Counter
+import gc
 
 
 def read_cylinder(cylinder_file):
@@ -386,13 +387,10 @@ class Cylinder_output:
             raise TypeError("files must be a list of str or str")
         self.state_str = []
         self.meta_data = []
-        data_list = []
-        for f in self.files:
-            data_list.append(read_k_cylinder(f, method))
         for f in self.files:
             s_list, meta_data, K_occu, W_occu = read_k_cylinder(f, method, get_occu=False)
-        # for s_list, meta_data, K_occu, W_occu in [read_k_cylinder(f, method, get_occu=False) for f in self.files]:
-            self.state_str.append(s_list[start:end:step])
+            s_list_sliced = s_list[start:end:step]
+            self.state_str.append(s_list_sliced)
             if time_step is None:
                 if "time_step" not in meta_data:
                     raise ValueError("time_step is not provided in the output file, please provide it manually")
@@ -401,6 +399,10 @@ class Cylinder_output:
             else:
                 meta_data["time_step"] = time_step * step
             self.meta_data.append(meta_data)
+            # del s_list  # free memory
+            # del K_occu
+            # del W_occu
+            # gc.collect()
 
     def get_state_distribution(self, state_list=None):
         """
