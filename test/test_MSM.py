@@ -145,7 +145,7 @@ class MyTestCase(unittest.TestCase):
             passage_track_alltraj = model.calc_passage_time()
             if "B" in model.node_map_s_2_int:
                 passage_track_A_B = passage_track_alltraj[0] [model.node_map_s_2_int['A']] [model.node_map_s_2_int['B']]
-                self.assertListEqual(passage_track_A_B, answer)
+                self.assertListEqual(passage_track_A_B.tolist(), answer)
             else:
                 self.assertListEqual(answer, [])
 
@@ -166,8 +166,8 @@ class MyTestCase(unittest.TestCase):
         model = kinetics.Sf_model(file_list)
         mfpt, mfpt_every_traj = model.get_mfpt()
         self.assertAlmostEqual(mfpt[0,1], np.mean(mfpt_01) * msm.time_step[0])
-        self.assertListEqual(model.passage_time_length_every_traj[0][0][1][:2], mfpt_01[:2])
-        self.assertListEqual(model.passage_time_length_every_traj[1][0][1], mfpt_01[2:])
+        self.assertListEqual(model.passage_time_length_every_traj[0][0][1][:2].tolist(), mfpt_01[:2])
+        self.assertListEqual(model.passage_time_length_every_traj[1][0][1].tolist(), mfpt_01[2:])
 
     def test_MFPT_matrix(self):
         file_list = [f"04-output_wrapper/C_0.75_2ps/05-2ps/{i:02}/analysis/04-state-code/k_cylinder.log" for i in
