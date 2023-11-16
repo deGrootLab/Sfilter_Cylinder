@@ -311,8 +311,8 @@ if __name__ == "__main__":
                                      -center. Centering on atoms from two chains will fail.""", )
     parser.add_argument("-pdb",
                         dest="top",
-                        help="Ideally This file should be generated from the same trjconv command as xtc. gro and tpr "
-                             "are also acceptable. Water should have resname of SOL, and Water oxygen should have "
+                        help="Ideally This file should be generated from the same trjconv command as xtc. gro but not "
+                             "tpr is also acceptable. Water should have resname of SOL, and Water oxygen should have "
                              "atom name of OW.",
                         metavar="top.pdb",
                         type=argparse.FileType('r'),
