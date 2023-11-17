@@ -19,3 +19,4 @@
 /tutorial/md_???.npy
 /test/01-NaK2K/1-Charmm/free_energy/Reaction1/19/k_cylinder/07-200wat/fix_100water_SF.pdb
 /script/*_perm_event.out
+/test/01-NaK2K/1-Charmm/dry/count_nojump/K_SF_perm_event_nj.csv
