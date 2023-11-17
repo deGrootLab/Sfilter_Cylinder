@@ -25,6 +25,9 @@ setup(
     author='Chenggong Hui',
     author_email='chenggong.hui@mpinat.mpg.de',
     packages=find_packages(),
-    scripts=['script/count_cylinder.py', 'script/match_xtck.py', 'script/analyse_distribution.py'],
+    scripts=['script/count_cylinder.py', 'script/match_xtck.py',
+             'script/analyse_distribution.py',
+             'script/count_nojump.py',
+             ],
     install_requires=["MDAnalysis", "numpy", "pandas", "scipy", "networkx", "matplotlib", "pyemma"],
 )
