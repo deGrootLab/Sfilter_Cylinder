@@ -1,0 +1,16 @@
+{
+    "pdb":"../em_dry.gro",
+    "xtc":"../fix_atom_c_100ps_dry_nojump.xtc",
+    "selection_dict":
+    {
+        "K"   : "name K"
+    },
+    "mem_layer":
+    {
+        "SF":
+        [
+            "resid 66 and resname TYR and name O",
+            "resid 63 and resname THR and name OG1"
+        ]
+    }
+}
