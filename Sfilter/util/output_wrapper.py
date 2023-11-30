@@ -5,6 +5,7 @@ from scipy.stats import sem
 from scipy.stats import gaussian_kde
 from scipy.stats import bootstrap
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
 import gc
 
 
@@ -434,6 +435,20 @@ class Cylinder_output:
             state_distribution.append(distri)
         return state_distribution, counter_list, counter_all
 
+    def _bootstrap_worker(self, traj, state_list, n_resamples, confidence_level, method, kwargs):
+        """
+        Worker function to perform bootstrap for a single trajectory.
+        """
+        def proportion(traj):
+            counter = Counter(traj)
+            return [counter[s] / counter.total() for s in state_list]
+
+        bootstrap_res = bootstrap((traj,), proportion, n_resamples=n_resamples,
+                                  confidence_level=confidence_level, method=method, **kwargs)
+        prop = proportion(traj)
+        return [[s, p, bootstrap_res.confidence_interval.low[i], bootstrap_res.confidence_interval.high[i]]
+                for i, (s, p) in enumerate(zip(state_list, prop))]
+
     def get_state_distribution_CI_bootstrap_frame(self, n_resamples=9999, confidence_level=0.95,
                                             method='BCa', **kwargs):
         """
@@ -455,23 +470,42 @@ class Cylinder_output:
         state_list = [i[0] for i in counter_all.most_common()]
         state_distribution, counter_list, counter_all = self.get_state_distribution(state_list)
 
-        def proportion(traj):
-            counter = Counter(traj)
-            res = []
-            for s in state_list:
-                res.append(counter[s] / counter.total())
-            return res
+        # Collect all futures here
+        futures = []
 
-        for i, (traj, state_proportion) in enumerate(zip(self.state_str, state_distribution)):
-            print(i, end=" ")
-            bootstrap_res = bootstrap((traj,), proportion, n_resamples=n_resamples, confidence_level=confidence_level,
-                                      method=method, **kwargs)
-            for i, s in enumerate(state_proportion):
-                s.append(bootstrap_res.confidence_interval.low[i])
-                s.append(bootstrap_res.confidence_interval.high[i])
+        # Using ProcessPoolExecutor to parallelize the task
+        with ProcessPoolExecutor() as executor:
+            for i, traj in enumerate(self.state_str):
+                # Submit the bootstrap worker function to the executor for each trajectory
+                future = executor.submit(self._bootstrap_worker, traj, state_list, n_resamples,
+                                         confidence_level, method, kwargs)
+                futures.append(future)
+
+        # Now retrieve the results as they are completed
+        for i, future in enumerate(futures):
+            print(f"Processing trajectory {i}")
+            state_proportion = future.result()
+            # Update the state_distribution with the bootstrap results
+            state_distribution[i] = state_proportion
+
         print("Done")
-
         return state_distribution
+
+        # state_distribution, counter_list, counter_all = self.get_state_distribution()
+        # state_list = [i[0] for i in counter_all.most_common()]
+        # state_distribution, counter_list, counter_all = self.get_state_distribution(state_list)
+        # def proportion(traj):
+        #     counter = Counter(traj)
+        #     return [counter[s] / counter.total() for s in state_list]
+        # for i, (traj, state_proportion) in enumerate(zip(self.state_str, state_distribution)):
+        #     print(i, end=" ")
+        #     bootstrap_res = bootstrap((traj,), proportion, n_resamples=n_resamples, confidence_level=confidence_level,
+        #                               method=method, **kwargs)
+        #     for i, s in enumerate(state_proportion):
+        #         s.append(bootstrap_res.confidence_interval.low[i])
+        #         s.append(bootstrap_res.confidence_interval.high[i])
+        # print("Done")
+        # return state_distribution
 
     def get_state_distribution_CI_bootstrap_traj(self, n_resamples=9999, confidence_level=0.95,
                                                  method='BCa', **kwargs):
