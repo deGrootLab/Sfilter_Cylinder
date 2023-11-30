@@ -468,7 +468,7 @@ class Cylinder_output:
         """
         state_distribution, counter_list, counter_all = self.get_state_distribution()
         state_list = [i[0] for i in counter_all.most_common()]
-        state_distribution, counter_list, counter_all = self.get_state_distribution(state_list)
+        # state_distribution, counter_list, counter_all = self.get_state_distribution(state_list)
 
         # Collect all futures here
         futures = []
@@ -482,14 +482,15 @@ class Cylinder_output:
                 futures.append(future)
 
         # Now retrieve the results as they are completed
+        result = []
         for i, future in enumerate(futures):
             print(f"Processing trajectory {i}")
             state_proportion = future.result()
             # Update the state_distribution with the bootstrap results
-            state_distribution[i] = state_proportion
+            result.append(state_proportion)
 
         print("Done")
-        return state_distribution
+        return result
 
         # state_distribution, counter_list, counter_all = self.get_state_distribution()
         # state_list = [i[0] for i in counter_all.most_common()]
