@@ -6,4 +6,4 @@ from .util import MSM
 from .util import kinetics
 from .util import Langevin
 
-__version__ = '0.6.2'
+__version__ = '0.6.3_dev'
