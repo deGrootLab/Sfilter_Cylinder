@@ -110,9 +110,11 @@ class MyTestCase(unittest.TestCase):
         s_list1, mdata1, K_occup1, W_occup1 = read_k_cylinder("01-NaK2K/1-Charmm/SOD/k_cylinder_POT.log", get_occu=True)
         s_list2, mdata2, K_occup2, W_occup2 = read_k_cylinder("01-NaK2K/1-Charmm/SOD/k_cylinder_SOD.log", get_occu=True)
         self.assertListEqual(s_list1, s_list2)
+        self.assertListEqual(s_list1[:5], ["WKKK0K", "K0KKKW", "K0KKKW", "K0KKKW", "K0KKKW"])
         s_list1, mdata1, K_occup1, W_occup1 = read_k_cylinder("01-NaK2K/1-Charmm/SOD/k_cylinder_POT.log", get_occu=False)
         s_list2, mdata2, K_occup2, W_occup2 = read_k_cylinder("01-NaK2K/1-Charmm/SOD/k_cylinder_SOD.log", get_occu=False)
         self.assertListEqual(s_list1, s_list2)
+        self.assertListEqual(s_list1[:5], ["WKKK0K", "K0KKKW", "K0KKKW", "K0KKKW", "K0KKKW"])
 
     def test_read_state_file_co_occupy(self):
         print("# TESTING read_k_cylinder, Co-occupy. 6 letter code contains K, W, and C")
