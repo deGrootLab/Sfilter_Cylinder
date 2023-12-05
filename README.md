@@ -65,6 +65,10 @@ match_xtck.py \
   -perm_up 01-xtck/perm_up.dat \
   -perm_down 01-xtck/perm_down.dat
   # match result with xtck
+
+cd $base/01-NaK2K/1-Charmm/dry/count_nojump
+count_nojump.py -i in.json
+# new script that runs on nojump xtc
 ```
 The potassium permeation will be saved in `POT_perm_event.out`. Please take a look at the resident time. 
 this is the time that the atom stays in the cylinder. This time should be safely smaller than the trajectory time step. 
