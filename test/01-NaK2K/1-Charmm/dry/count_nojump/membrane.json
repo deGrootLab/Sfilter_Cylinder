@@ -1,0 +1,9 @@
+{
+    "pdb":"xx.pdb",
+    "xtc":"xx/fix_nojump.xtc",
+    "selection_dict":
+    {
+        "Wat"   : "resname SOL and name OW"
+    },
+    "mem_str":"resname POPC and name C2"
+}
