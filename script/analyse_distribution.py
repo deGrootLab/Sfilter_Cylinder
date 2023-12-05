@@ -13,7 +13,8 @@ import sys
 
 
 def state_distribution_2_dict(state_distribution):
-    state_set = set([s[0] for traj in state_distribution for s in traj])
+    # state_set = set([s[0] for traj in state_distribution for s in traj])
+    state_set = set([s[0] for s in state_distribution[0]])
     state_dict = {s: {"ave": [], "low": [], "up": []} for s in state_set}
     for traj in state_distribution:
         # make sure every state appears in this traj
