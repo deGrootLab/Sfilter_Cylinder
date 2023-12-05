@@ -82,6 +82,18 @@ class MyTestCase(unittest.TestCase):
         self.assertListEqual(state_distribution[0][:2], ["WKK0KW", (201 + 121) / 1002])
         self.assertListEqual(state_distribution[1][:2], ["KK0KKW", (41 + 166) / 1002])
 
+    def test_s6l_function1_original(self):
+        l = "# S6l 0 WKKK0K\n"
+        self.assertEqual(Sfilter.util.output_wrapper._s6l_function1_original(l), "WKKK0K")
+        l = "# S6l 1 K0KKKW"
+        self.assertEqual(Sfilter.util.output_wrapper._s6l_function1_original(l), "K0KKKW")
+
+    def test_s6l_function2_nonK(self):
+        l = "# S6l 0 Wat , SOD , SOD , SOD , , SOD Wat ,\n"
+        self.assertEqual(Sfilter.util.output_wrapper._s6l_function2_nonK(l, ion="SOD"), "WKKK0K")
+        l = "# S6l 1 SOD Wat , , SOD , SOD , SOD , Wat ,"
+        self.assertEqual(Sfilter.util.output_wrapper._s6l_function2_nonK(l, ion="SOD"), "K0KKKW")
+
     def test_read_k_cylinder(self):
         print("# TESTING read_k_cylinder, see if we can read the correct 6 letter code and meta data")
         for get_occu in [True, False]:
@@ -92,6 +104,15 @@ class MyTestCase(unittest.TestCase):
             # meta_data
             self.assertDictEqual(meta_data,
                                  {"time_step": 2.0, })
+
+    def test_read_k_cylinder_SOD(self):
+        print("# TESTING read_k_cylinder, SOD")
+        s_list1, mdata1, K_occup1, W_occup1 = read_k_cylinder("01-NaK2K/1-Charmm/SOD/k_cylinder_POT.log", get_occu=True)
+        s_list2, mdata2, K_occup2, W_occup2 = read_k_cylinder("01-NaK2K/1-Charmm/SOD/k_cylinder_SOD.log", get_occu=True)
+        self.assertListEqual(s_list1, s_list2)
+        s_list1, mdata1, K_occup1, W_occup1 = read_k_cylinder("01-NaK2K/1-Charmm/SOD/k_cylinder_POT.log", get_occu=False)
+        s_list2, mdata2, K_occup2, W_occup2 = read_k_cylinder("01-NaK2K/1-Charmm/SOD/k_cylinder_SOD.log", get_occu=False)
+        self.assertListEqual(s_list1, s_list2)
 
     def test_read_state_file_co_occupy(self):
         print("# TESTING read_k_cylinder, Co-occupy. 6 letter code contains K, W, and C")

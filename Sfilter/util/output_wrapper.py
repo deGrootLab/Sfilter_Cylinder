@@ -247,6 +247,35 @@ def line_to_state(line):
     return state_str, n_pot, n_wat
 
 
+def _s6l_function1_original(line):
+    """
+    This is the basic S6l function which works for K and POT.
+    return the last word which is the 6 letter code
+    :param line:
+    :return: str
+    """
+    return line.split()[-1]
+
+def _s6l_function2_nonK(line, ion):
+    sites = line.rstrip().split(",")
+    letters = ""
+    if ion in sites[0][7:]:
+        letters += "K"
+    elif "Wat" in sites[0][7:]:
+        letters += "W"
+    else:
+        letters += "0"
+    for s in sites[1:-1]:
+        if ion in s:
+            letters += "K"
+        elif "Wat" in s:
+            letters += "W"
+        else:
+            letters += "0"
+    return letters
+
+
+
 def read_k_cylinder(file, method="K_priority", get_occu=True):
     """
     read 1 output file from k_cylinder
@@ -255,7 +284,8 @@ def read_k_cylinder(file, method="K_priority", get_occu=True):
         method: "K_priority" or "Co-occupy"
             In "K_priority", if there is a K in the binding site, letter K will be assigned.
             In "Co-occupy", if there is a K and one or more water in the binding site, letter C will be assigned.
-        get_occu: if True, compute K_occupency and W_occupency for K and W occupency. otherwise, return empty list
+        get_occu: if True, compute K_occupency and W_occupency for K and W occupancy. otherwise, return empty list,
+            default True
     return:
         state_list, states string is a list
         meta_data, a dict
@@ -270,6 +300,16 @@ def read_k_cylinder(file, method="K_priority", get_occu=True):
         for l in lines:
             if "Sfilter Version" in l:
                 meta_data["version"] = l.split()[-1]
+            elif "Ion name(s) in this pdb" in l:
+                l = l.rstrip()
+                ion_list = eval(l.split(":")[-1])
+                if len(ion_list) != 1:
+                    raise ValueError("There should be one and only one ion in this pdb")
+                if ion_list == ["POT"] or ion_list == ["K"]:
+                    s6l_fun = _s6l_function1_original
+                else:
+                    def s6l_fun(line):
+                        return _s6l_function2_nonK(line, ion=ion_list[0])
             elif "time step in this xtc is" in l:
                 meta_data["time_step"] = float(l.split()[-2])
                 break
@@ -280,7 +320,7 @@ def read_k_cylinder(file, method="K_priority", get_occu=True):
             while i < len(lines):
                 l = lines[i]
                 if "# S6l" in l:
-                    state_list.append(l.split()[-1])
+                    state_list.append(s6l_fun(l))
                     if get_occu:
                         K_occ_tmp = np.zeros(6, dtype=np.int64)
                         W_occ_tmp = np.zeros(6, dtype=np.int64)
