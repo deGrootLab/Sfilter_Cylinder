@@ -1,0 +1,51 @@
+# Permeation up 4 -> 1 -> 3 #######
+# index (0 base),  frame,  time(ps), resident_time_in_the_cylinder
+  476           , 672884, 134576.8020053506, 36019.400536730886
+  322           , 753626, 150725.2022459805, 24051.40035839379
+  393           , 884421, 176884.20263577998, 42697.8006362468
+  436           , 1550468, 310093.6046207547, 169604.20252729952
+  263           , 1556077, 311215.40463747084, 59298.20088361204
+  449           , 1594954, 318990.80475333333, 11699.200174331665
+  443           , 1626818, 325363.60484829545, 15206.200226590037
+  321           , 1804464, 360892.8053777218, 49682.00074031949
+  435           , 1818619, 363723.805419907, 40388.80060184002
+  416           , 1866718, 373343.60556325316, 15380.40022918582
+  431           , 1874592, 374918.4055867195, 13623.80020301044
+  296           , 1883930, 376786.0056145489, 3832.0000571012497
+  365           , 2085637, 417127.4062156826, 43152.60064302385
+  463           , 2119547, 423909.4063167423, 48954.000729471445
+  305           , 2174733, 434946.6064812094, 21985.40032760799
+  279           , 2188604, 437720.8065225482, 17939.60026732087
+  301           , 2208692, 441738.4065824151, 7190.200107142329
+  289           , 2500000, 500000.0074505806, 61624.20091827214
+  387           , 2500000, 500000.0074505806, 65043.60096922517
+# Permeation up 3 -> 1 -> 4 #######
+# index (0 base),  frame,  time(ps), resident_time_in_the_cylinder
+  476           , 349958, 69991.60104295611, 69991.40104295313
+
+#################################
+time step in this xtc  : 0.20000000298023224 ps
+Assumed voltage (mV)   : 150.0
+Simulation time (ns)   : 500.0000074505806
+Permeation events up   : 19
+Permeation events down : 1
+Ave current (pA)       : 5.76785
+Ave conductance (pS)   : 38.45230
+Minimum resident time up crossing   : 3832.0000571012497
+Minimum resident time down crossing : 69991.40104295313
+###############################
+
+Safety check
+Net permeation events up crossing 4    : 18
+Minimum up   crossing resident time    : 674.6000100523233
+Minimum down crossing resident time    : 1531.200022816658
+Net permeation events up crossing 3    : 105
+Minimum up   crossing resident time    : 425.20000633597374
+Minimum down crossing resident time    : 69991.40104295313
+Number of 1_2, SF inside out     event : 0
+Number of 2_1, SF outside in     event : 0
+Number of 3_2, upper to membrane event : 31334
+Number of 2_3, membrane to upper event : 31334
+Number of 4_2, lower to membrane event : 0
+Number of 2_4, membrane to lower event : 0
+Done
