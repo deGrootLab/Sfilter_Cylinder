@@ -100,6 +100,7 @@ class Sf_model:
         :param lag_step: lag step for calculating properties (transition matrix), default is 1.
         :param traj_dtype: data type of the trajectory. default is np.int16. np.int8 is not safe.
         """
+
         t0 = time.time()
         # check arguments and initialize variables
         if file_list is None:
@@ -138,6 +139,7 @@ class Sf_model:
         self.net_flux_matrix_every_traj = None
         self.passage_time_point_every_traj = None  # lumped traj
         self.passage_time_length_every_traj = None  # lumped traj
+        self.passage_time_point_every_traj_raw = None  # lumped traj
         self.passage_time_length_every_traj_raw = None  # raw traj
         self.rate_raw = None
         self.mechanism_G = None
@@ -175,6 +177,7 @@ class Sf_model:
             self.set_traj_from_int(traj_tmp_list, time_step_list[0] * step, map_int_2_s, dtype_lumped=traj_dtype,
                                    init_raw_properties=False)
             t3 = time.time()
+            self.raw_traj_df = None
             self._init_raw_properties(dtype_lumped=traj_dtype)
             t4 = time.time()
             if print_time:
@@ -257,6 +260,7 @@ class Sf_model:
         self.net_flux_raw = copy.deepcopy(self.net_flux_matrix)
         self.calc_passage_time()
         self.passage_time_length_every_traj_raw = copy.deepcopy(self.passage_time_length_every_traj)
+        self.passage_time_point_every_traj_raw = copy.deepcopy(self.passage_time_point_every_traj)
         self.rate_raw, _ = self.get_rate_passage_time(traj_type="raw")
 
         # build a DataFrame for the raw traj
@@ -299,6 +303,150 @@ class Sf_model:
                                          "rate_AB": rate_AB, "rate_BA": rate_BA,
                                          "dist_AB": dist_AB, "dist_BA": dist_BA})
         self.raw_traj_df["rate_AB_x_rate_BA"] = self.raw_traj_df["rate_AB"] * self.raw_traj_df["rate_BA"]
+
+    def _cycle_correct(self, p ):
+        i, j, perm_list = p
+        df_ij = self.rate_cycle_correct(i, j, perm_list)
+        df_ji = self.rate_cycle_correct(j, i, perm_list)
+        df_ij_cc = df_ij[df_ij["h_Permeation"] <= 1]
+        df_ji_cc = df_ji[df_ji["h_Permeation"] <= 1]
+        r_AB_npass_cc, r_BA_npass_cc = (len(df_ij_cc) / (self.state_Counter[self.state_map_int_2_s[i]] * self.time_step),
+                                        len(df_ji_cc) / (self.state_Counter[self.state_map_int_2_s[j]] * self.time_step))
+        r_AB_inv_mfpt_cc, r_BA_inv_mfpt_cc = 1/df_ij_cc.mean()["passage_time"], 1/df_ji_cc.mean()["passage_time"]
+        return r_AB_npass_cc, r_BA_npass_cc, r_AB_inv_mfpt_cc, r_BA_inv_mfpt_cc
+
+    def init_raw_properties_2(self, perm_list, clean_lump=False, dtype_lumped=np.int16,
+                              proportion_cutoff=1e-5, flux_cutoff=1, n_cpu=None, ):
+        """
+
+        :param perm_list:
+        :param clean_lump:
+        :param dtype_lumped:
+        :param proportion_cutoff: default 1e-5
+            when proportion of both state_A and state_B > proportion_cutoff, edge [A,B] will be counted.
+        :param flux_cutoff: default 1
+            when flux_AB > flux_cutoff and flux_BA > flux_cutoff, edge [A,B] will be counted.
+        :param n_cpu:
+        pre-screen the edge by proportion_cutoff and flux_cutoff will save time.
+        :return:
+        """
+        if clean_lump:
+            self.set_lumping_from_str([], dtype_lumped, calc_passage_time=False)  # At the end of this function, properties will be calculated.
+            self.calc_passage_time()
+        self.flux_raw = copy.deepcopy(self.flux_matrix)
+        self.net_flux_raw = copy.deepcopy(self.net_flux_matrix)
+
+        self.passage_time_length_every_traj_raw = copy.deepcopy(self.passage_time_length_every_traj)
+        rate_n_passage = self.get_rate_passage_time(traj_type="raw")[0]
+        rate_inv_mfpt  = self.get_rate_inverse_mfpt(traj_type="raw")[0]
+
+
+        # build a DataFrame for the raw traj
+        index_A = []
+        index_B = []
+        index_pair = []
+        A_list = []
+        B_list = []
+        A_proportion = []
+        B_proportion = []
+        net_flux_AB = []
+        flux_AB = []
+        flux_BA = []
+        rate_AB = []
+        rate_BA = []
+        rate_AB_cc = []  # with cycle correction
+        rate_BA_cc = []
+        task_list = []
+        dist_AB = []
+        dist_BA = []
+        for i in range(len(self.net_flux_raw)):
+            for j in range(len(self.net_flux_raw)):
+
+                if i != j:
+                    proportion_check = self.state_distribution[self.state_map_int_2_s[i]] >= proportion_cutoff and \
+                                        self.state_distribution[self.state_map_int_2_s[j]] >= proportion_cutoff
+                    flux_check = self.flux_raw[i, j] > flux_cutoff and self.flux_raw[j, i] > flux_cutoff and \
+                                 self.net_flux_raw[i, j] >= 0
+                    if proportion_check and flux_check and ((j, i) not in index_pair):
+                        index_pair.append((i, j))
+                        index_A.append(i)
+                        index_B.append(j)
+                        A_list.append(self.state_map_int_2_s[i])
+                        B_list.append(self.state_map_int_2_s[j])
+                        A_proportion.append(self.state_distribution[self.state_map_int_2_s[i]])
+                        B_proportion.append(self.state_distribution[self.state_map_int_2_s[j]])
+                        net_flux_AB.append(self.net_flux_raw[i, j])
+                        flux_AB.append(self.flux_raw[i, j])
+                        flux_BA.append(self.flux_raw[j, i])
+
+
+                        # without cycle correction
+                        r_AB_npass,    r_BA_npass    = rate_n_passage[i, j], rate_n_passage[j, i]
+                        r_AB_inv_mfpt, r_BA_inv_mfpt = rate_inv_mfpt[i, j],  rate_inv_mfpt[j, i]
+                        rate_AB.append([r_AB_npass,  r_AB_inv_mfpt, ])
+                        rate_BA.append([r_BA_npass,  r_BA_inv_mfpt, ])
+
+                        # with cycle correction
+                        task_list.append((i, j, perm_list))
+
+
+
+
+                        d_ab, d_ba = k_distance(self.state_map_int_2_s[i], self.state_map_int_2_s[j])
+                        dist_AB.append(d_ab)
+                        dist_BA.append(d_ba)
+        # parallelization
+        with ProcessPoolExecutor(max_workers=n_cpu) as executor:
+            futures = []
+            for p in task_list:
+                future = executor.submit(self._cycle_correct, p)
+                futures.append(future)
+
+            for future in futures:
+                r_AB_npass_cc, r_BA_npass_cc, r_AB_inv_mfpt_cc, r_BA_inv_mfpt_cc = future.result()
+                rate_AB_cc.append([r_AB_npass_cc, r_AB_inv_mfpt_cc])
+                rate_BA_cc.append([r_BA_npass_cc, r_BA_inv_mfpt_cc])
+        self.raw_traj_df = pd.DataFrame({"index_A": index_A, "index_B": index_B, "A": A_list, "B": B_list,
+                                         "A_proportion": A_proportion, "B_proportion": B_proportion,
+                                         "net_flux_AB": net_flux_AB, "flux_AB": flux_AB, "flux_BA": flux_BA,
+                                         "rate_AB_npass":    [i[0] for i in rate_AB],
+                                         "rate_AB_inv_mfpt": [i[1] for i in rate_AB],
+                                         "rate_BA_npass":    [i[0] for i in rate_BA],
+                                         "rate_BA_inv_mfpt": [i[1] for i in rate_BA],
+                                         "rate_ABcc_npass":    [i[0] for i in rate_AB_cc],
+                                         "rate_ABcc_inv_mfpt": [i[1] for i in rate_AB_cc],
+                                         "rate_BAcc_npass":    [i[0] for i in rate_BA_cc],
+                                         "rate_BAcc_inv_mfpt": [i[1] for i in rate_BA_cc],
+                                         "dist_AB": dist_AB, "dist_BA": dist_BA})
+        self.raw_traj_df["rate_AB_x_rate_BA"] = self.raw_traj_df["rate_ABcc_inv_mfpt"] * self.raw_traj_df["rate_BAcc_inv_mfpt"]
+        self.raw_traj_df = self.raw_traj_df.sort_values(by='rate_AB_x_rate_BA', ascending=False)
+        return self.raw_traj_df
+
+    def rate_cycle_correct(self, ind_i, ind_j, perm_list):
+        rep_index_list = []
+        passage_index_list = []
+        passage_time = []
+        half_p_count = []
+
+        for rep in range(len(perm_list)):
+            pt_len = self.passage_time_length_every_traj_raw[rep][ind_i][ind_j]
+            pt_point = self.passage_time_point_every_traj_raw[rep][ind_i][ind_j]
+            perm_array = perm_list[rep][["enter", "time"]].to_numpy()  # unit in ps. up/down will be ignored
+
+            for i_passage, (end, length) in enumerate(zip(pt_point, pt_len)):
+                start = end - length  # unit in frame
+                passage_index_list.append(i_passage)
+                rep_index_list.append(rep)
+                passage_time.append(length * self.time_step)
+                half_p_count.append(np.sum(np.logical_and(perm_array > start * self.time_step,
+                                                          perm_array < end * self.time_step)))  # convert unit to ps
+        Df_ij = pd.DataFrame({"replica": rep_index_list,
+                              "passage_index": passage_index_list,
+                              "passage_time": passage_time,
+                              "h_Permeation": half_p_count,
+                              })
+        return Df_ij
+        # return Df_ij[Df_ij["h_Permeation"] <= 1].mean()["passage time"]
 
     def set_lumping_from_str(self, lumping_list, dtype=np.int16, calc_passage_time=False, letter=6):
         """
@@ -659,8 +807,9 @@ class Sf_model:
         Update rate to the graph
         :return:
         """
-        rate, _ = self.get_rate_passage_time()
-        self.mechanism_G.set_graph_rate(rate)
+        # rate, _ = self.get_rate_passage_time()
+        # self.mechanism_G.set_graph_rate(rate)
+        self.mechanism_G.set_graph_rate_df(self.raw_traj_df, self.node_map_int_2_s)
 
 
 def k_distance(A, B):
@@ -762,6 +911,70 @@ class Mechanism_Graph:
                 if self.G.has_edge(i, j):
                     self.G.edges[i, j]["rate_ij"] = rate[i, j]
                     self.G.edges[i, j]["rate_ji"] = rate[j, i]
+
+
+    def get_graph_rate_df_node_ij(self, node_i, node_j):
+        """
+        for a given edge (node_i -> node_j), use the rate with the maximum flux.
+        :param df:
+        :param node_map_int_2_s:
+        :param node_i:
+        :param node_j:
+        :return: state_i, state_j, rate_ij, rate_ji
+        """
+        df = self.raw_traj_df
+        node_map_int_2_s = self.node_map_int_2_s
+        # loop over all states
+        max_flux_ij = 0
+        rate_ij = 0
+        rate_ji = 0
+        str_i = ""
+        str_j = ""
+        for s_i in node_map_int_2_s[node_i]:
+            for s_j in node_map_int_2_s[node_j]:
+                # find the row in df, it can either be A->B or B->A
+                row_AB = df[(df["A"] == s_i) & (df["B"] == s_j)]
+                row_BA = df[(df["A"] == s_j) & (df["B"] == s_i)]
+
+                if len(row_AB) == 0 and len(row_BA) == 0:
+                    continue
+                elif len(row_AB) == 0 and len(row_BA) == 1:
+                    if row_BA["flux_BA"].values[0] > max_flux_ij:
+                        max_flux_ij = row_BA["flux_BA"].values[0]
+                        rate_ij = row_BA["rate_ABcc_inv_mfpt"].values[0]
+                        rate_ji = row_BA["rate_BAcc_inv_mfpt"].values[0]
+                        str_i = s_i
+                        str_j = s_j
+                elif len(row_AB) == 1 and len(row_BA) == 0:
+                    if row_AB["flux_AB"].values[0] > max_flux_ij:
+                        max_flux_ij = row_AB["flux_AB"].values[0]
+                        rate_ij = row_AB["rate_ABcc_inv_mfpt"].values[0]
+                        rate_ji = row_AB["rate_BAcc_inv_mfpt"].values[0]
+                        str_i = s_i
+                        str_j = s_j
+                else:
+                    raise ValueError("There should be only one row in df.")
+        return str_i, str_j, rate_ij, rate_ji
+
+
+
+
+    def set_graph_rate_df(self):
+        """
+        for each edge, use the rate with the maximum flux.
+        :param df:
+        :return:
+        """
+        df = self.raw_traj_df
+        node_map_int_2_s = self.node_map_int_2_s
+        # loop over edges
+        for node_i, node_j, data in self.G.edges(data=True):
+            str_i, str_j, rate_ij, rate_ji = self.get_graph_rate_df_node_ij(node_i, node_j)
+            self.G.edges[node_i, node_j]["rate_ij"] = rate_ij
+            self.G.edges[node_i, node_j]["rate_ji"] = rate_ji
+
+
+
 
     def get_node_proportion(self, node):
         """
@@ -923,11 +1136,17 @@ class Mechanism_Graph:
         size_dict = {i: min_size + (max_size - min_size) * (self.node_distribution[i] - min_p) / (max_p - min_p) for i
                      in self.G.nodes}
         # color
+        color_dict = {1: [1  , 0.1, 0.1, 1],
+                      2: [0.5, 0.5, 1  , 1],
+                      3: [1  , 0.5, 0.5, 1],
+                      4: [0.5, 1  , 0.5, 1],
+                      5: [0.5, 1  , 1  , 1],
+                      }
         color_list = []
         for node in sub_G:
             K_number = self.node_map_int_2_s[node][0][:5].count("K") + self.node_map_int_2_s[node][0][:5].count("C")
-            K_number = (K_number + 8) % 10
-            color_list.append(plt.rcParams['axes.prop_cycle'].by_key()['color'][K_number])
+            # K_number = (K_number + 8) % 10
+            color_list.append(color_dict[K_number])
         nx.draw_networkx_nodes(sub_G, ax=ax, pos=pos,
                                node_size=[size_dict[i] for i in sub_G.nodes], node_color=color_list, alpha=node_alpha)
         nx.draw_networkx_labels(sub_G, ax=ax, pos=pos, labels=nx.get_node_attributes(sub_G, "label"),
@@ -956,7 +1175,8 @@ class Mechanism_Graph:
         width_list = [min_width + (max_width - min_width) * (rate - min_rate) / (max_rate - min_rate) for rate in
                       edge_rate]
         nx.draw_networkx_edges(sub_G, ax=ax, pos=pos, edgelist=edge_list, width=width_list, alpha=edge_alpha,
-                               connectionstyle='arc3,rad=0.05', )
+                               connectionstyle='arc3,rad=0.05',
+                               node_size=[size_dict[i] for i in sub_G.nodes])
         nx.draw_networkx_edge_labels(sub_G, ax=ax, pos=pos, edge_labels=edge_label, bbox=label_bbox)
 
         # return
