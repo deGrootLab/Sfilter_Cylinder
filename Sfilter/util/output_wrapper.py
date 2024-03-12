@@ -281,9 +281,10 @@ def read_k_cylinder(file, method="K_priority", get_occu=True):
     read 1 output file from k_cylinder
     Args:
         file: output file from k_cylinder
-        method: "K_priority" or "Co-occupy"
+        method: "K_priority" or "Co-occupy" or "K_priority_S14"
             In "K_priority", if there is a K in the binding site, letter K will be assigned.
             In "Co-occupy", if there is a K and one or more water in the binding site, letter C will be assigned.
+            In "K_priority_S14", the same as "K_priority", but only the S1-S4 are considered.
         get_occu: if True, compute K_occupency and W_occupency for K and W occupancy. otherwise, return empty list,
             default True
     return:
@@ -358,8 +359,27 @@ def read_k_cylinder(file, method="K_priority", get_occu=True):
                         W_occupency.append(W_occ_tmp)
                 else:
                     i += 1
+        elif method == "K_priority_S14":
+            i = 0
+            while i < len(lines):
+                l = lines[i]
+                if "# S6l" in l:
+                    state_list.append(s6l_fun(l)[1:5])
+                    if get_occu:
+                        K_occ_tmp = np.zeros(6, dtype=np.int64)
+                        W_occ_tmp = np.zeros(6, dtype=np.int64)
+                        for j in range(1, 7):
+                            try:
+                                s_code, K_occ_tmp[j - 1], W_occ_tmp[j - 1] = line_to_state(lines[i + j])
+                            except:
+                                raise ValueError(i + j, lines[i + j], "There is something wrong with this line")
+                        K_occupency.append(K_occ_tmp)
+                        W_occupency.append(W_occ_tmp)
+                    i += 6
+                else:
+                    i += 1
         else:
-            raise ValueError("method should be K_priority or Co-occupy")
+            raise ValueError("method should be K_priority, Co-occupy, or K_priority_S14")
     return state_list, meta_data, np.array(K_occupency), np.array(W_occupency)
 
 def read_k_cylinder_list(file_list, method="K_priority", get_occu=True):

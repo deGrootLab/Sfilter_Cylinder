@@ -96,7 +96,7 @@ class Sf_model:
         :param method: method to calculate the state, default is "K_priority".
             "K_priority", if there is a K in the binding site, letter K will be assigned.
             "Co-occupy", if there is a K and one or more water in the binding site, letter C will be assigned.
-            No other method is implemented.
+            "K_priority_S14", the same as "K_priority", but only the S1-S4 are considered.
         :param lag_step: lag step for calculating properties (transition matrix), default is 1.
         :param traj_dtype: data type of the trajectory. default is np.int16. np.int8 is not safe.
         """
