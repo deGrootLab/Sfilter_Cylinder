@@ -27,7 +27,7 @@ def read_cylinder(cylinder_file):
             if "Permeation up 4 -> 1 -> 3" in l:
                 for j in range(2, len(lines) - i):
                     l = lines[i + j]
-                    if ("Permeation up 3 -> 1 -> 4" in l) or "None" in l or l == "\n":
+                    if ("Permeation up 3 -> 1 -> 4" in l) or ("Permeation down 3 -> 1 -> 4" in l) or "None" in l or l == "\n":
                         i = i + j - 1
                         break
                     else:
@@ -36,7 +36,7 @@ def read_cylinder(cylinder_file):
                         p_time.append(float(words[2]))
                         p_resident_time.append(float(words[3]))
                         p_up.append(True)
-            elif "Permeation up 3 -> 1 -> 4" in l:
+            elif "Permeation up 3 -> 1 -> 4" in l or ("Permeation down 3 -> 1 -> 4" in l):
                 for j in range(2, len(lines) - i):
                     l = lines[i + j]
                     if ("##############" in l) or "None" in l or l == "\n":

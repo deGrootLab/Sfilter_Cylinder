@@ -109,7 +109,7 @@ class PermeationEvent:
             lines.append(f"  {index:<14d}, {frame:6d}, {frame * time_step:9}, {resident_time * time_step}\n")
         if len(self.up_1_count) == 0:
             lines.append("None\n")
-        lines.append("# Permeation up 3 -> 1 -> 4 #######\n")
+        lines.append("# Permeation down 3 -> 1 -> 4 #######\n")
         lines.append("# index (0 base),  frame,  time(ps), resident_time_in_the_cylinder\n")
         for index, frame, resident_time in self.down_1_count:
             lines.append(f"  {index:<14d}, {frame:6d}, {frame * time_step:9}, {resident_time * time_step}\n")
