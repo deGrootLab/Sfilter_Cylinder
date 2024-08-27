@@ -6,7 +6,6 @@ from scipy.stats import gaussian_kde
 from scipy.stats import bootstrap
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
-import gc
 
 
 def read_cylinder(cylinder_file):
@@ -437,7 +436,10 @@ class Cylinder_output:
         :param end: default None, final frame.
         :param step: default 1, no slicing.
         if you need to subsample the trajectory by slicing, you can provide start, end, step.
-        :param method: "K_priority" or "Co-occupy"
+        :param method: "K_priority" or "Co-occupy" or "K_priority_S14"
+            In "K_priority", if there is a K in the binding site, letter K will be assigned.
+            In "Co-occupy", if there is a K and one or more water in the binding site, letter C will be assigned.
+            In "K_priority_S14", the same as "K_priority", but only the S1-S4 are considered.
         :param time_step: The time step in the trajectory. If None, use the time step in the output file
         """
         if isinstance(files, Path) or isinstance(files, str):
@@ -460,10 +462,7 @@ class Cylinder_output:
             else:
                 meta_data["time_step"] = time_step * step
             self.meta_data.append(meta_data)
-            # del s_list  # free memory
-            # del K_occu
-            # del W_occu
-            # gc.collect()
+
 
     def get_state_distribution(self, state_list=None):
         """
