@@ -183,16 +183,16 @@ class Sf_model:
             if not np.allclose(time_step_list, time_step_list[0]):
                 raise ValueError("The time step between files are not the same.", str(time_step_list))
             t2 = time.time()
-            self.set_traj_from_int(traj_tmp_list, time_step_list[0] * step, map_int_2_s, dtype_lumped=traj_dtype,
+            self.set_traj_from_int(traj_tmp_list, time_step_list[0] * step, map_int_2_s, dtype=traj_dtype,
                                    init_raw_properties=False)
             t3 = time.time()
             self.raw_traj_df = None
             self._init_raw_properties(dtype_lumped=traj_dtype)
             t4 = time.time()
             if print_time:
-                print("load files             (s):", t2 - t0)
-                print("set lumped traj        (s):", t3 - t2)
-                print("compute raw properties (s):", t4 - t3)
+                print("load files                (s):", t2 - t0)
+                print("set traj and lumped traj  (s):", t3 - t2)
+                print("compute raw properties    (s):", t4 - t3)
 
     def set_traj_from_str(self, traj_list, time_step, dtype=np.int16, dtype_lumped=np.int16, init_raw_properties=True):
         """
@@ -224,20 +224,18 @@ class Sf_model:
         if init_raw_properties:
             self._init_raw_properties(dtype_lumped=dtype_lumped)
 
-    def set_traj_from_int(self, traj_list, time_step, map_int_2_s, dtype=np.int16, dtype_lumped=np.int16, init_raw_properties=True):
+    def set_traj_from_int(self, traj_list, time_step, map_int_2_s, dtype=np.int16, init_raw_properties=True):
         """
         Set the trajectory from lists of int.
-        :param traj_list: a list of np.array(). Each np.array() is a sequence of int.
-        :param time_step: time step between frames.
+        :param traj_list: a list of np.array(). Each np.array() is a sequence of int. State 0 doesn't need to be the
+            most common state. We will re-arrange the internal state index.
+        :param time_step: time step between frames. Unit is ps.
         :param map_int_2_s: map from int to state (str).
         :param dtype: data type of the trajectory. default is np.int16.
-        :param dtype_lumped: data type of the lumped trajectory. default is np.int16.
         :return: None
         """
         if dtype not in [np.int8, np.int16, np.int32, np.int64]:
-            raise ValueError("dtype should be np.int8, np.int16, np.int32, np.int64.")
-        if dtype_lumped not in [np.int8, np.int16, np.int32, np.int64]:
-            raise ValueError("dtype_lumped should be np.int8, np.int16, np.int32, np.int64.")
+            raise ValueError("dtype should be np.int16, np.int32, np.int64.")
 
         self.time_step = time_step
         Counter_tmp = Counter([])
@@ -261,7 +259,7 @@ class Sf_model:
             self.traj_raw.append(np.array([map_old_2_new[i] for i in traj], dtype=dtype))
 
         if init_raw_properties:
-            self._init_raw_properties(dtype_lumped=dtype_lumped)
+            self._init_raw_properties(dtype_lumped=dtype)
 
     def _init_raw_properties(self, dtype_lumped=np.int16):
         self.set_lumping_from_str([], dtype_lumped, calc_passage_time=False)  # At the end of this function, properties will be calculated.
