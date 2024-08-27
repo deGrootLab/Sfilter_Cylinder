@@ -99,6 +99,11 @@ class Sf_model:
             "K_priority_S14", the same as "K_priority", but only the S1-S4 are considered.
         :param lag_step: lag step for calculating properties (transition matrix), default is 1.
         :param traj_dtype: data type of the trajectory. default is np.int16. np.int8 is not safe.
+            There are 6 binding sites S0-S5.
+            If one uses K/W/0, there are 3^6=729 possibilities.
+            If one uses K/W/C/0, there are 4^6=4096 possibilities.
+            int8  (-128 to 127) is not enough.
+            int16 (-32768 to 32767) is enough.
         """
 
         t0 = time.time()
@@ -109,6 +114,10 @@ class Sf_model:
             self.file_list = [file_list]
         elif isinstance(file_list, list):
             self.file_list = file_list
+        if traj_dtype == np.int8:
+            warnings.warn("np.int8 (-128 to 127) is not safe for this application. Please use np.int16 (-32768 to 32767).")
+        elif traj_dtype not in [np.int8, np.int16, np.int32, np.int64]:
+            raise ValueError("traj_dtype should be np.int16, np.int32, np.int64.")
 
         # variables for raw trajectory
         self.time_step = 0  # time step between frames
