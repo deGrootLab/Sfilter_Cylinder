@@ -302,21 +302,37 @@ def read_k_cylinder(file, method="K_priority", get_occu=True, get_jump=False):
     with open(file) as f:
         lines = f.readlines()
         meta_data = {}
-        for l in lines:
+        ion_list = [""]
+        for line_num, l in enumerate(lines):
             if "Sfilter Version" in l:
                 meta_data["version"] = l.split()[-1]
             elif "Ion name(s) in this pdb" in l:
                 l = l.rstrip()
                 ion_list = eval(l.split(":")[-1])
                 if len(ion_list) != 1:
-                    raise ValueError("There should be one and only one ion in this pdb")
+                    raise ValueError("There should be one and only one ion in this output file.")
                 if ion_list == ["POT"] or ion_list == ["K"]:
                     s6l_fun = _s6l_function1_original
                 else:
                     def s6l_fun(line):
                         return _s6l_function2_nonK(line, ion=ion_list[0])
+                meta_data["ion_name"] = ion_list[0]
             elif "time step in this xtc is" in l:
                 meta_data["time_step"] = float(l.split()[-2])
+            elif f"Number of {ion_list[0]} found is" in l:
+                meta_data["num_ion"] = int(l.split()[-1])
+                # read the ion index from i+1 until "]" appears
+                ion_index = [int(k) for k in lines[line_num + 1][1:].split()]
+                for j in range(line_num + 2, len(lines)):
+                    if "]" in lines[j]:
+                        # remove "]"
+                        l = lines[j].rstrip()[:-1]
+                        ion_index.extend([int(k) for k in l.split()])
+                        break
+                    ion_index.extend([int(k) for k in lines[j].split()])
+                meta_data["ion_index"] = ion_index
+
+            elif "# S6l" in l:
                 break
         K_occupency = []
         W_occupency = []
@@ -328,48 +344,96 @@ def read_k_cylinder(file, method="K_priority", get_occu=True, get_jump=False):
         else:
             # check if the last frame is finished
             lines_frames = lines[i0:]
-            for i, line in enumerate(lines[-1:-7:-1]):
+            for line_num, line in enumerate(lines[-1:-7:-1]):
                 if "# S6l" in line: # broken frame, we ignore the last frame from this line
-                    lines_frames = lines[i0:-i - 1]
+                    lines_frames = lines[i0:-line_num - 1]
                     break
         if method == "K_priority":
-            for i in range(0, len(lines_frames), 7):
-                state_list.append(s6l_fun(lines_frames[i]))
-                if get_occu:
+            if not get_occu and not get_jump:
+                for line_num in range(0, len(lines_frames), 7):
+                    state_list.append(s6l_fun(lines_frames[line_num]))
+                return state_list, meta_data, np.array(K_occupency), np.array(W_occupency)
+            elif get_occu and not get_jump:
+                for line_num in range(0, len(lines_frames), 7):
+                    state_list.append(s6l_fun(lines_frames[line_num]))
                     K_occ_tmp = np.zeros(6, dtype=np.int8)
                     W_occ_tmp = np.zeros(6, dtype=np.int8)
                     for j in range(0, 6):
-                        pot, wat = lines_frames[i + j + 1].split(",")[:2]
+                        pot, wat = lines_frames[line_num + j + 1].split(",")[:2]
                         K_occ_tmp[j] = len(pot.split(":")[1].split())
                         W_occ_tmp[j] = len(wat.split(":")[1].split())
                     K_occupency.append(K_occ_tmp)
                     W_occupency.append(W_occ_tmp)
+                return state_list, meta_data, np.array(K_occupency), np.array(W_occupency)
+            elif get_occu and get_jump:
+                jump_list = []
+                a_size = max(meta_data["num_ion"], max(meta_data["ion_index"]) - min(meta_data["ion_index"]))
+                ion_state_array_old = np.zeros(a_size, dtype=np.int8)+ 6
+                ion_state_array_i   = np.zeros(a_size, dtype=np.int8) + 6
+                index_delta = min(meta_data["ion_index"])
+                jump_convertion_LUT = np.array(
+                    [[ 0,  1,  2,  3,  4,  5, -1],
+                     [-1,  0,  1,  2,  3,  4, -2],
+                     [-2, -1,  0,  1,  2,  3, -3],
+                     [-3, -2, -1,  0,  1,  2,  3],
+                     [-4, -3, -2, -1,  0,  1,  2],
+                     [-5, -4, -3, -2, -1,  0,  1],
+                     [ 1, -5, -4, -3, -2, -1,  0]
+                     ]
+                )
+                # initial state for frame 0
+                for site in range(0, 6):
+                    pot, wat = lines_frames[site + 1].split(",")[:2]
+                    pot_index = [int(ipot)-index_delta for ipot in pot.split(":")[1].split()]
+                    ion_state_array_old[pot_index] = site
+
+
+                for line_num in range(0, len(lines_frames), 7):
+                    state_list.append(s6l_fun(lines_frames[line_num]))
+                    K_occ_tmp = np.zeros(6, dtype=np.int8)
+                    W_occ_tmp = np.zeros(6, dtype=np.int8)
+                    ion_state_array_i[:] = 6
+                    for site in range(0, 6):
+                        pot, wat = lines_frames[line_num + site + 1].split(",")[:2]
+                        pot_index = [int(ipot)-index_delta for ipot in pot.split(":")[1].split()]
+                        ion_state_array_i[pot_index] = site
+                        K_occ_tmp[site] = len(pot_index)
+                        W_occ_tmp[site] = len(wat.split(":")[1].split())
+                    # compute the jump using LUT
+                    jump = -jump_convertion_LUT[ion_state_array_old, ion_state_array_i].sum()
+                    jump_list.append(jump)
+                    ion_state_array_old[:] = ion_state_array_i
+                    K_occupency.append(K_occ_tmp)
+                    W_occupency.append(W_occ_tmp)
+                return state_list, meta_data, np.array(K_occupency), np.array(W_occupency), np.array(jump_list, dtype=np.int8)
+            else:
+                raise ValueError("get_occu=False and get_jump=True would not work. Please give True for both")
 
         elif method == "Co-occupy":
-            for i in range(0, len(lines_frames), 7):
+            for line_num in range(0, len(lines_frames), 7):
                 K_occ_tmp = np.zeros(6, dtype=np.int64)
                 W_occ_tmp = np.zeros(6, dtype=np.int64)
-                s_code0, K_occ_tmp[0], W_occ_tmp[0] = line_to_state(lines_frames[i + 1])
-                s_code1, K_occ_tmp[1], W_occ_tmp[1] = line_to_state(lines_frames[i + 2])
-                s_code2, K_occ_tmp[2], W_occ_tmp[2] = line_to_state(lines_frames[i + 3])
-                s_code3, K_occ_tmp[3], W_occ_tmp[3] = line_to_state(lines_frames[i + 4])
-                s_code4, K_occ_tmp[4], W_occ_tmp[4] = line_to_state(lines_frames[i + 5])
-                s_code5, K_occ_tmp[5], W_occ_tmp[5] = line_to_state(lines_frames[i + 6])
+                s_code0, K_occ_tmp[0], W_occ_tmp[0] = line_to_state(lines_frames[line_num + 1])
+                s_code1, K_occ_tmp[1], W_occ_tmp[1] = line_to_state(lines_frames[line_num + 2])
+                s_code2, K_occ_tmp[2], W_occ_tmp[2] = line_to_state(lines_frames[line_num + 3])
+                s_code3, K_occ_tmp[3], W_occ_tmp[3] = line_to_state(lines_frames[line_num + 4])
+                s_code4, K_occ_tmp[4], W_occ_tmp[4] = line_to_state(lines_frames[line_num + 5])
+                s_code5, K_occ_tmp[5], W_occ_tmp[5] = line_to_state(lines_frames[line_num + 6])
                 state_list.append( s_code0 + s_code1 + s_code2 + s_code3 + s_code4 + s_code5 )
                 if get_occu:
                     K_occupency.append(K_occ_tmp)
                     W_occupency.append(W_occ_tmp)
         elif method == "K_priority_S14":
-            for i in range(0, len(lines_frames), 7):
-                l = lines_frames[i]
+            for line_num in range(0, len(lines_frames), 7):
+                l = lines_frames[line_num]
                 state_list.append(s6l_fun(l)[1:5])
                 if get_occu:
                     K_occ_tmp = np.zeros(4, dtype=np.int64)
                     W_occ_tmp = np.zeros(4, dtype=np.int64)
-                    s_code, K_occ_tmp[0], W_occ_tmp[0] = line_to_state(lines[i + 2])
-                    s_code, K_occ_tmp[1], W_occ_tmp[1] = line_to_state(lines[i + 3])
-                    s_code, K_occ_tmp[2], W_occ_tmp[2] = line_to_state(lines[i + 4])
-                    s_code, K_occ_tmp[3], W_occ_tmp[3] = line_to_state(lines[i + 5])
+                    s_code, K_occ_tmp[0], W_occ_tmp[0] = line_to_state(lines[line_num + 2])
+                    s_code, K_occ_tmp[1], W_occ_tmp[1] = line_to_state(lines[line_num + 3])
+                    s_code, K_occ_tmp[2], W_occ_tmp[2] = line_to_state(lines[line_num + 4])
+                    s_code, K_occ_tmp[3], W_occ_tmp[3] = line_to_state(lines[line_num + 5])
                     K_occupency.append(K_occ_tmp)
                     W_occupency.append(W_occ_tmp)
         else:
