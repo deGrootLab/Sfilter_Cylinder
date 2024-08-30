@@ -222,7 +222,7 @@ class Perm_event_output:
         return bootstrap_res
 
 
-def line_to_state(line):
+def line_to_state(line, get_state_str=True):
     """
     convert a line of k_cylinder output to a state code
     return:
@@ -233,17 +233,20 @@ def line_to_state(line):
     pot, wat = line.split(",")[:2]
     n_pot = len(pot.split(":")[1].split())
     n_wat = len(wat.split(":")[1].split())
-    if n_pot == 0 and n_wat == 0:
-        state_str = "0"
-    elif n_pot == 0 and n_wat > 0:
-        state_str = "W"
-    elif n_pot > 0 and n_wat > 0:
-        state_str = "C"
-    elif n_pot > 0 and n_wat == 0:
-        state_str = "K"
+    if get_state_str:
+        if n_pot == 0 and n_wat == 0:
+            state_str = "0"
+        elif n_pot == 0 and n_wat > 0:
+            state_str = "W"
+        elif n_pot > 0 and n_wat > 0:
+            state_str = "C"
+        elif n_pot > 0 and n_wat == 0:
+            state_str = "K"
+        else:
+            raise ValueError("n_pot and n_wat should be positive")
+        return state_str, n_pot, n_wat
     else:
-        raise ValueError("n_pot and n_wat should be positive")
-    return state_str, n_pot, n_wat
+        return n_pot, n_wat
 
 
 def _s6l_function1_original(line):
@@ -275,7 +278,7 @@ def _s6l_function2_nonK(line, ion):
 
 
 
-def read_k_cylinder(file, method="K_priority", get_occu=True):
+def read_k_cylinder(file, method="K_priority", get_occu=True, get_jump=False):
     """
     read 1 output file from k_cylinder
     Args:
@@ -286,11 +289,13 @@ def read_k_cylinder(file, method="K_priority", get_occu=True):
             In "K_priority_S14", the same as "K_priority", but only the S1-S4 are considered.
         get_occu: if True, compute K_occupency and W_occupency for K and W occupancy. otherwise, return empty list,
             default True
+        get_jump: if True, read the ion jump information from the ion index, default False.
     return:
         state_list, states string is a list
         meta_data, a dict
         K_occupency, a np.array() of K occupancy
         W_occupency, a np.array() of W occupancy
+        jump_array, a np.array( dtype=np.int8) of ion jump, if get_jump is True
     """
     state_list = []
 
@@ -315,68 +320,58 @@ def read_k_cylinder(file, method="K_priority", get_occu=True):
                 break
         K_occupency = []
         W_occupency = []
+        for i0, line in enumerate(lines):
+            if "# S6l" in line:
+                break
+        if "########" in lines[-1]:
+            lines_frames = lines[i0:-1]  # count_cylinder.py properly finished, the last line is "########"
+        else:
+            # check if the last frame is finished
+            lines_frames = lines[i0:]
+            for i, line in enumerate(lines[-1:-7:-1]):
+                if "# S6l" in line: # broken frame, we ignore the last frame from this line
+                    lines_frames = lines[i0:-i - 1]
+                    break
         if method == "K_priority":
-            i = 0
-            while i < len(lines):
-                l = lines[i]
-                if "# S6l" in l:
-                    state_list.append(s6l_fun(l))
-                    if get_occu:
-                        K_occ_tmp = np.zeros(6, dtype=np.int64)
-                        W_occ_tmp = np.zeros(6, dtype=np.int64)
-                        for j in range(1, 7):
-                            try:
-                                s_code, K_occ_tmp[j-1], W_occ_tmp[j-1] = line_to_state(lines[i + j])
-                            except:
-                                raise ValueError(i+j, lines[i + j], "There is something wrong with this line")
-                        K_occupency.append(K_occ_tmp)
-                        W_occupency.append(W_occ_tmp)
-                    i += 6
-                else:
-                    i += 1
-            # for l in lines:
-            #     if "# S6l" in l:
-            #         K_occupency.append([])
-            #         W_occupency.append([])
-            #         s = l.split()[-1]
-            #         state_list.append(s)
+            for i in range(0, len(lines_frames), 7):
+                state_list.append(s6l_fun(lines_frames[i]))
+                if get_occu:
+                    K_occ_tmp = np.zeros(6, dtype=np.int8)
+                    W_occ_tmp = np.zeros(6, dtype=np.int8)
+                    for j in range(0, 6):
+                        pot, wat = lines_frames[i + j + 1].split(",")[:2]
+                        K_occ_tmp[j] = len(pot.split(":")[1].split())
+                        W_occ_tmp[j] = len(wat.split(":")[1].split())
+                    K_occupency.append(K_occ_tmp)
+                    W_occupency.append(W_occ_tmp)
+
         elif method == "Co-occupy":
-            i = 0
-            while i < len(lines):
-                l = lines[i]
-                state_str = ""
-                if "# S6l" in l:
-                    K_occ_tmp = np.zeros(6, dtype=np.int64)
-                    W_occ_tmp = np.zeros(6, dtype=np.int64)
-                    for j in range(1, 7):
-                        s_code, K_occ_tmp[j-1], W_occ_tmp[j-1] = line_to_state(lines[i + j])
-                        state_str += s_code
-                    state_list.append(state_str)
-                    i += 6
-                    if get_occu:
-                        K_occupency.append(K_occ_tmp)
-                        W_occupency.append(W_occ_tmp)
-                else:
-                    i += 1
+            for i in range(0, len(lines_frames), 7):
+                K_occ_tmp = np.zeros(6, dtype=np.int64)
+                W_occ_tmp = np.zeros(6, dtype=np.int64)
+                s_code0, K_occ_tmp[0], W_occ_tmp[0] = line_to_state(lines_frames[i + 1])
+                s_code1, K_occ_tmp[1], W_occ_tmp[1] = line_to_state(lines_frames[i + 2])
+                s_code2, K_occ_tmp[2], W_occ_tmp[2] = line_to_state(lines_frames[i + 3])
+                s_code3, K_occ_tmp[3], W_occ_tmp[3] = line_to_state(lines_frames[i + 4])
+                s_code4, K_occ_tmp[4], W_occ_tmp[4] = line_to_state(lines_frames[i + 5])
+                s_code5, K_occ_tmp[5], W_occ_tmp[5] = line_to_state(lines_frames[i + 6])
+                state_list.append( s_code0 + s_code1 + s_code2 + s_code3 + s_code4 + s_code5 )
+                if get_occu:
+                    K_occupency.append(K_occ_tmp)
+                    W_occupency.append(W_occ_tmp)
         elif method == "K_priority_S14":
-            i = 0
-            while i < len(lines):
-                l = lines[i]
-                if "# S6l" in l:
-                    state_list.append(s6l_fun(l)[1:5])
-                    if get_occu:
-                        K_occ_tmp = np.zeros(6, dtype=np.int64)
-                        W_occ_tmp = np.zeros(6, dtype=np.int64)
-                        for j in range(1, 7):
-                            try:
-                                s_code, K_occ_tmp[j - 1], W_occ_tmp[j - 1] = line_to_state(lines[i + j])
-                            except:
-                                raise ValueError(i + j, lines[i + j], "There is something wrong with this line")
-                        K_occupency.append(K_occ_tmp)
-                        W_occupency.append(W_occ_tmp)
-                    i += 6
-                else:
-                    i += 1
+            for i in range(0, len(lines_frames), 7):
+                l = lines_frames[i]
+                state_list.append(s6l_fun(l)[1:5])
+                if get_occu:
+                    K_occ_tmp = np.zeros(4, dtype=np.int64)
+                    W_occ_tmp = np.zeros(4, dtype=np.int64)
+                    s_code, K_occ_tmp[0], W_occ_tmp[0] = line_to_state(lines[i + 2])
+                    s_code, K_occ_tmp[1], W_occ_tmp[1] = line_to_state(lines[i + 3])
+                    s_code, K_occ_tmp[2], W_occ_tmp[2] = line_to_state(lines[i + 4])
+                    s_code, K_occ_tmp[3], W_occ_tmp[3] = line_to_state(lines[i + 5])
+                    K_occupency.append(K_occ_tmp)
+                    W_occupency.append(W_occ_tmp)
         else:
             raise ValueError("method should be K_priority, Co-occupy, or K_priority_S14")
     return state_list, meta_data, np.array(K_occupency), np.array(W_occupency)

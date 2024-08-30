@@ -4,6 +4,8 @@ from Sfilter import Perm_event_output
 from Sfilter import Cylinder_output
 from Sfilter.util.output_wrapper import read_k_cylinder
 from Sfilter.util.output_wrapper import read_k_cylinder_list
+import time
+from pathlib import Path
 
 class MyTestCase(unittest.TestCase):
     def test_line_to_state(self):
@@ -167,6 +169,35 @@ class MyTestCase(unittest.TestCase):
                                  [0, 0, 0, 0, 0, 14],
                                  [0, 0, 0, 0, 0, 9]
                              ])
+
+    def test_read_k_cylinder_broken_line(self):
+        print("# TESTING read_k_cylinder, broken line")
+        for i in range(6):
+            s_list, meta_data, K_occupency, W_occupency = read_k_cylinder(f"01-NaK2K/1-Charmm/broken_last_frame/k_cylinder_{i}.out")
+            self.assertListEqual(s_list, ["WKKKKW", "KK0KKW", "KK0KKW", "WKKKKW", "WKKKKW",
+                                      "WKKKKW", "KK0KKW", "WKK0KW", "0K0KKW", "WK0KKW"])
+
+
+    def test_read_k_cylinder_speed(self):
+        test_file = Path("/home/chui/E29Project-2023-04-11/076-MthK/20-C-POT-iso_radius/22-0.78/07_+150_0.2ps/00/analysis/08-02-1.8A/k_cylinder.log")
+        if test_file.is_file():
+            print("# TESTING read_k_cylinder, speed test... ")
+            for name, flag in (("get_occu=False", False),
+                               ("get_occu=True",  True),):
+                t0 = time.time()
+                s_list, meta_data, K_occupency, W_occupency = read_k_cylinder(test_file, get_occu=flag)
+                t1 = time.time()
+                self.assertListEqual(s_list[:3], ["WKK0K0", "WKK0K0", "WKK0KW"])
+                self.assertListEqual(s_list[-9:], ["WKK0KW", "WKK0K0", "WKK0K0", "WKK0K0", "WKK0K0",
+                                                   "WKK0K0", "WKK0K0", "WKK0K0", "WKK0K0",])
+                print(f"{name} : {t1 - t0}")
+
+
+        else:
+            print("# TESTING read_k_cylinder, speed, file not found")
+
+
+
 
 
 
