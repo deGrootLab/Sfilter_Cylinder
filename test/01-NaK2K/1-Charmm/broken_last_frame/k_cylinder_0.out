@@ -1,0 +1,134 @@
+#################################################################################
+Time : 2023-07-12 11:16:53
+The command you used is :
+/home/chui/Software-2023-04-11/miniconda3/envs/py3.11_test/bin/count_cylinder.py -pdb ../em.gro -xtc fix_atom_c_100ps.xtc -K POT -SF_seq THR VAL GLY TYR GLY -n_water 400 -reduced_xtc fix_400wat.xtc -non_wat nWat
+PDB top file : ../em.gro
+xtc traj file: fix_atom_c_100ps.xtc
+Ion name(s) in this pdb should be: ['POT']
+The Voltage in this simulation is: 300.0 mV
+The sequence of the SF is: ['THR', 'VAL', 'GLY', 'TYR', 'GLY'] []
+The cylinder radius is   : 2.5 Å
+Radius cutoff for S0 is  : 4 Å
+Z cutoff for S5 is       : 4 Å
+Water-reduced xtc output    : fix_400wat.xtc
+The number of water to keep : 400
+#################################################################################
+time step in this xtc is : 100.0 ps
+S00
+GLY O, Index (0 base): 753
+GLY O, Index (0 base): 2243
+GLY O, Index (0 base): 3733
+GLY O, Index (0 base): 5223
+S01
+TYR O, Index (0 base): 746
+TYR O, Index (0 base): 2236
+TYR O, Index (0 base): 3726
+TYR O, Index (0 base): 5216
+S12
+GLY O, Index (0 base): 725
+GLY O, Index (0 base): 2215
+GLY O, Index (0 base): 3705
+GLY O, Index (0 base): 5195
+S23
+VAL O, Index (0 base): 718
+VAL O, Index (0 base): 2208
+VAL O, Index (0 base): 3698
+VAL O, Index (0 base): 5188
+S34
+THR O, Index (0 base): 702
+THR O, Index (0 base): 2192
+THR O, Index (0 base): 3682
+THR O, Index (0 base): 5172
+S45
+THR OG1, Index (0 base): 695
+THR OG1, Index (0 base): 2185
+THR OG1, Index (0 base): 3675
+THR OG1, Index (0 base): 5165
+Number of POT found is 160
+[5960 5961 5962 5963 5964 5965 5966 5967 5968 5969 5970 5971 5972 5973
+ 5974 5975 5976 5977 5978 5979 5980 5981 5982 5983 5984 5985 5986 5987
+ 5988 5989 5990 5991 5992 5993 5994 5995 5996 5997 5998 5999 6000 6001
+ 6002 6003 6004 6005 6006 6007 6008 6009 6010 6011 6012 6013 6014 6015
+ 6016 6017 6018 6019 6020 6021 6022 6023 6024 6025 6026 6027 6028 6029
+ 6030 6031 6032 6033 6034 6035 6036 6037 6038 6039 6040 6041 6042 6043
+ 6044 6045 6046 6047 6048 6049 6050 6051 6052 6053 6054 6055 6056 6057
+ 6058 6059 6060 6061 6062 6063 6064 6065 6066 6067 6068 6069 6070 6071
+ 6072 6073 6074 6075 6076 6077 6078 6079 6080 6081 6082 6083 6084 6085
+ 6086 6087 6088 6089 6090 6091 6092 6093 6094 6095 6096 6097 6098 6099
+ 6100 6101 6102 6103 6104 6105 6106 6107 6108 6109 6110 6111 6112 6113
+ 6114 6115 6116 6117 6118 6119]
+# Loop Over Traj ################################################################################
+The non-water atoms to keep are nWat
+The water-redueced pdb file is : fix_400wat_nWat.pdb
+# S6l 0 WKKKKW
+ POT : , Wat : 60299 ,
+ POT : 5963 , Wat : ,
+ POT : 5962 , Wat : ,
+ POT : 5961 , Wat : ,
+ POT : 5960 , Wat : ,
+ POT : , Wat : 31253 32579 39977 40145 43670 44588 50645 53642 57056 59456 ,
+# S6l 1 KK0KKW
+ POT : 5963 , Wat : ,
+ POT : 5962 , Wat : ,
+ POT : , Wat : ,
+ POT : 5961 , Wat : ,
+ POT : 5960 , Wat : ,
+ POT : , Wat : 35879 36476 39977 40145 41861 41975 50645 52292 54116 59456 61961 ,
+# S6l 2 KK0KKW
+ POT : 5963 , Wat : ,
+ POT : 5962 , Wat : ,
+ POT : , Wat : ,
+ POT : 5961 , Wat : ,
+ POT : 5960 , Wat : ,
+ POT : , Wat : 36476 37469 41861 47114 47471 49097 51185 51449 55040 55124 55148 55781 61961 ,
+# S6l 3 WKKKKW
+ POT : , Wat : 48137 ,
+ POT : 5963 , Wat : ,
+ POT : 5962 , Wat : ,
+ POT : 5961 , Wat : ,
+ POT : 5960 , Wat : ,
+ POT : , Wat : 31295 37469 40427 41861 43874 51449 55148 58355 59456 61961 ,
+# S6l 4 WKKKKW
+ POT : , Wat : 35384 50423 ,
+ POT : 5963 , Wat : ,
+ POT : 5962 , Wat : ,
+ POT : 5961 , Wat : ,
+ POT : 5960 , Wat : ,
+ POT : , Wat : 35789 37016 38117 39977 41861 47114 49463 50645 51449 55781 55916 ,
+# S6l 5 WKKKKW
+ POT : , Wat : 42764 53675 ,
+ POT : 5963 , Wat : ,
+ POT : 5962 , Wat : ,
+ POT : 5961 , Wat : ,
+ POT : 5960 , Wat : ,
+ POT : , Wat : 30692 36476 36842 37469 38414 40154 40427 48152 51185 55916 58601 ,
+# S6l 6 KK0KKW
+ POT : 5963 , Wat : 55301 ,
+ POT : 5962 , Wat : ,
+ POT : , Wat : ,
+ POT : 5961 , Wat : ,
+ POT : 5960 , Wat : ,
+ POT : , Wat : 30692 38414 39023 39977 40427 54728 55040 55781 55916 59456 61961 ,
+# S6l 7 WKK0KW
+ POT : , Wat : 43610 ,
+ POT : 5962 , Wat : ,
+ POT : 5961 , Wat : ,
+ POT : , Wat : ,
+ POT : 5960 , Wat : ,
+ POT : , Wat : 30692 32579 36476 37358 38840 39977 40088 40427 41174 49463 59456 ,
+# S6l 8 0K0KKW
+ POT : , Wat : ,
+ POT : 5962 , Wat : ,
+ POT : , Wat : ,
+ POT : 5961 , Wat : ,
+ POT : 5960 , Wat : ,
+ POT : , Wat : 32579 39023 40088 41174 54728 55745 55781 55916 56774 61961 ,
+# S6l 9 WK0KKW
+ POT : , Wat : 41318 ,
+ POT : 5962 , Wat : ,
+ POT : , Wat : ,
+ POT : 5961 , Wat : ,
+ POT : 5960 , Wat : ,
+ POT : , Wat : 30773 33674 37121 39977 44867 49463 50429 55781 56774 61961 ,
+# S6l 10 K0KKKW
+
