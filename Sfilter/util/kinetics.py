@@ -131,6 +131,7 @@ class Sf_model:
         self.state_map_s_2_int = {}  # map from state to int
         self.state_Counter = None  # Counter of states(str)
         self.state_distribution = {}  # proportion of each state(str)
+        self.state_distribution_alltraj = {}  # proportion of each state(str) in each traj
 
         # variables for lumped trajectory (node)
         self.traj_node = []  # lumped trajectory
@@ -199,7 +200,6 @@ class Sf_model:
             self.set_traj_from_int(traj_tmp_list, time_step_list[0] * step, map_int_2_s, dtype=traj_dtype,
                                    init_raw_properties=False)
             t3 = time.time()
-            self.raw_traj_df = None
             self._init_raw_properties(dtype_lumped=traj_dtype)
             self.passage_cycle_correct = Passage_cycle_correct(self.traj_raw_alltraj,
                                                                self.passage_time_length_alltraj_raw,
@@ -229,12 +229,14 @@ class Sf_model:
         self.total_frame = self.state_Counter.total()
 
         # loop over state_Counter from the most common state to the least common state
+
         for i, (s, frame) in enumerate(self.state_Counter.most_common()):
             self.state_distribution[s] = frame / self.total_frame
             self.state_map_int_2_s[i] = s
             self.state_map_s_2_int[s] = i
             self.node_map_int_2_s[i] = [s]
             self.node_map_s_2_int[s] = i
+
 
         self.traj_raw_alltraj = []
         for traj in traj_list:
@@ -301,6 +303,9 @@ class Sf_model:
         self.passage_time_point_alltraj_raw : A list of 2D list
             self.passage_time_point_alltraj_raw[rep][i][j] is the time point (unit in step) when the passage from
             state i to state j finished in the rep-th traj.
+
+        self.state_distribution_alltraj : A dictionary
+            self.state_distribution_alltraj[s] is a list of proportion of state s in each traj.
         :return: None
         """
         self.calc_flux_raw()
@@ -312,199 +317,114 @@ class Sf_model:
         self.passage_time_point_alltraj_raw = copy.deepcopy(self.passage_time_point_alltraj)
         self.rate_raw, _ = self.get_rate_passage_time(traj_type="raw")
 
-        # # build a DataFrame for the raw traj
-        # index_A = []
-        # index_B = []
-        # index_pair = []
-        # A_list = []
-        # B_list = []
-        # A_proportion = []
-        # B_proportion = []
-        # net_flux_AB = []
-        # flux_AB = []
-        # flux_BA = []
-        # rate_AB = []
-        # rate_BA = []
-        # dist_AB = []
-        # dist_BA = []
-        # for i in range(len(self.flux_matrix_raw)):
-        #     for j in range(len(self.flux_matrix_raw)):
-        #         if i != j:
-        #             if self.flux_matrix_raw[i, j] > 0 and self.net_flux_matrix_raw[i, j] >= 0 and ((j, i) not in index_pair):
-        #                 index_pair.append((i, j))
-        #                 index_A.append(i)
-        #                 index_B.append(j)
-        #                 A_list.append(self.state_map_int_2_s[i])
-        #                 B_list.append(self.state_map_int_2_s[j])
-        #                 A_proportion.append(self.state_distribution[self.state_map_int_2_s[i]])
-        #                 B_proportion.append(self.state_distribution[self.state_map_int_2_s[j]])
-        #                 net_flux_AB.append(self.net_flux_raw[i, j])
-        #                 flux_AB.append(self.flux_matrix_raw[i, j])
-        #                 flux_BA.append(self.flux_matrix_raw[j, i])
-        #                 rate_AB.append(self.rate_raw[i, j])
-        #                 rate_BA.append(self.rate_raw[j, i])
-        #                 d_ab, d_ba = k_distance(self.state_map_int_2_s[i], self.state_map_int_2_s[j])
-        #                 dist_AB.append(d_ab)
-        #                 dist_BA.append(d_ba)
-        # self.raw_traj_df = pd.DataFrame({"index_A": index_A, "index_B": index_B, "A": A_list, "B": B_list,
-        #                                  "A_proportion": A_proportion, "B_proportion": B_proportion,
-        #                                  "net_flux_AB": net_flux_AB, "flux_AB": flux_AB, "flux_BA": flux_BA,
-        #                                  "rate_AB": rate_AB, "rate_BA": rate_BA,
-        #                                  "dist_AB": dist_AB, "dist_BA": dist_BA})
-        # self.raw_traj_df["rate_AB_x_rate_BA"] = self.raw_traj_df["rate_AB"] * self.raw_traj_df["rate_BA"]
+        self.state_distribution_alltraj = {s: np.zeros(len(self.traj_raw_alltraj)) for s, count in
+                                           self.state_Counter.items()}
+        for rep, traj in enumerate(self.traj_raw_alltraj):
+            count = Counter(traj)
+            for s_index, frame in count.items():
+                s = self.state_map_int_2_s[s_index]
+                self.state_distribution_alltraj[s][rep] = frame / len(traj)
+
+
 
     def get_state_index(self, state):
-        pass
+        """
+        given a state, return the index of the state.
+        :param state: str
+        :return: int
+        """
+        return self.state_map_s_2_int[state]
 
     def get_flux_AB(self, state_A, state_B):
-        pass
+        """
+        Get the flux from state_A to state_B.
+        :param state_A: str or int
+        :param state_B: str or int
+        :return: flux, flux_alltraj
+            flux : int, the flux from state_A to state_B.
+            flux_alltraj : a list of int, the flux from state_A to state_B in each replica.
+        """
+        if isinstance(state_A, str):
+            state_A = self.get_state_index(state_A)
+        if isinstance(state_B, str):
+            state_B = self.get_state_index(state_B)
+        flux = self.flux_matrix_raw[state_A, state_B]
+        flux_alltraj = [f_rep[state_A, state_B]    for f_rep in self.flux_matrix_raw_alltraj]
+        return flux, flux_alltraj
 
     def get_concentration(self, state):
-        pass
-
-    def get_mfpt_AB(self, state_A, state_B):
-        pass
-
-    def _cycle_correct(self, p ):
-        i, j, perm_list = p
-        df_ij = self.rate_cycle_correct(i, j, perm_list)
-        df_ji = self.rate_cycle_correct(j, i, perm_list)
-        df_ij_cc = df_ij[df_ij["h_Permeation"] <= 1]
-        df_ji_cc = df_ji[df_ji["h_Permeation"] <= 1]
-        r_AB_npass_cc, r_BA_npass_cc = (len(df_ij_cc) / (self.state_Counter[self.state_map_int_2_s[i]] * self.time_step),
-                                        len(df_ji_cc) / (self.state_Counter[self.state_map_int_2_s[j]] * self.time_step))
-        r_AB_inv_mfpt_cc, r_BA_inv_mfpt_cc = 1/df_ij_cc.mean()["passage_time"], 1/df_ji_cc.mean()["passage_time"]
-        return r_AB_npass_cc, r_BA_npass_cc, r_AB_inv_mfpt_cc, r_BA_inv_mfpt_cc
-
-    def init_raw_properties_2(self, perm_list, clean_lump=False, dtype_lumped=np.int16,
-                              proportion_cutoff=1e-5, flux_cutoff=1, n_cpu=None, ):
         """
+        Get the concentration(population) of a state.
+        :param state: str or int
+        :return: c, c_alltraj
+            c : float, the concentration of the state.
+            c_alltraj : a list of float, the concentration of the state in each replica.
+        """
+        if isinstance(state, int):
+            state = self.state_map_int_2_s[state]
+        c = self.state_distribution[state]
+        c_alltraj = self.state_distribution_alltraj[state]
+        return c, c_alltraj
 
-        :param perm_list:
-        :param clean_lump:
-        :param dtype_lumped:
-        :param proportion_cutoff: default 1e-5
-            when proportion of both state_A and state_B > proportion_cutoff, edge [A,B] will be counted.
-        :param flux_cutoff: default 1
-            when flux_AB > flux_cutoff and flux_BA > flux_cutoff, edge [A,B] will be counted.
-        :param n_cpu:
-        pre-screen the edge by proportion_cutoff and flux_cutoff will save time.
+    def get_passage_AB(self, state_A, state_B):
+        """
+        Get the passage info from state_A to state_B.
+        passage_A_to_B can correspond to different jumps. WKK0KW to KK0KKW can be -2 or +5. This function will return all
+        possible jumps.
+        :param state_A: str or int
+        :param state_B: str or int
         :return:
+            A dictionary
+                key: number of jumps
+                value: (length, start, end)
+                    length[rep][k] is the k-th passage time length in replica rep.
+                    start[rep][k]  is the k-th passage time starting point in replica rep.
+                    end[rep][k]    is the k-th passage time ending point in replica rep.
         """
-        if clean_lump:
-            self.set_lumping_from_str([], dtype_lumped, calc_passage_time=False)  # At the end of this function, properties will be calculated.
-            self.calc_passage_time()
-        self.flux_raw = copy.deepcopy(self.flux_matrix)
-        self.net_flux_raw = copy.deepcopy(self.net_flux_matrix)
+        if isinstance(state_A, str):
+            state_A = self.get_state_index(state_A)
+        if isinstance(state_B, str):
+            state_B = self.get_state_index(state_B)
+        return self.passage_cycle_correct.get_passage_ij(state_A, state_B)
 
-        self.passage_time_length_alltraj_raw = copy.deepcopy(self.passage_time_length_alltraj)
-        rate_n_passage = self.get_rate_passage_time(traj_type="raw")[0]
-        rate_inv_mfpt  = self.get_rate_inverse_mfpt(traj_type="raw")[0]
-
-
-        # build a DataFrame for the raw traj
-        index_A = []
-        index_B = []
-        index_pair = []
-        A_list = []
-        B_list = []
-        A_proportion = []
-        B_proportion = []
-        net_flux_AB = []
-        flux_AB = []
-        flux_BA = []
-        rate_AB = []
-        rate_BA = []
-        rate_AB_cc = []  # with cycle correction
-        rate_BA_cc = []
-        task_list = []
-        dist_AB = []
-        dist_BA = []
-        for i in range(len(self.net_flux_raw)):
-            for j in range(len(self.net_flux_raw)):
-
-                if i != j:
-                    proportion_check = self.state_distribution[self.state_map_int_2_s[i]] >= proportion_cutoff and \
-                                        self.state_distribution[self.state_map_int_2_s[j]] >= proportion_cutoff
-                    flux_check = self.flux_raw[i, j] > flux_cutoff and self.flux_raw[j, i] > flux_cutoff and \
-                                 self.net_flux_raw[i, j] >= 0
-                    if proportion_check and flux_check and ((j, i) not in index_pair):
-                        index_pair.append((i, j))
-                        index_A.append(i)
-                        index_B.append(j)
-                        A_list.append(self.state_map_int_2_s[i])
-                        B_list.append(self.state_map_int_2_s[j])
-                        A_proportion.append(self.state_distribution[self.state_map_int_2_s[i]])
-                        B_proportion.append(self.state_distribution[self.state_map_int_2_s[j]])
-                        net_flux_AB.append(self.net_flux_raw[i, j])
-                        flux_AB.append(self.flux_raw[i, j])
-                        flux_BA.append(self.flux_raw[j, i])
+    def get_passage_AB_shortest(self, state_A, state_B):
+        """
+        Get the passage info from state_A to state_B.
+        passage_A_to_B can correspond to different jumps. WKK0KW to KK0KKW can be -2 or +5. This function will only
+        return the passage info for the shortest passage. For example, -2 for WKK0KW to KK0KKW.
+        :param state_A: str or int
+        :param state_B: str or int
+        :return:
+            (length, start, end)
+                length[rep][k] is the k-th passage time length in replica rep.
+                start[rep][k]  is the k-th passage time starting point in replica rep.
+                end[rep][k]    is the k-th passage time ending point in replica rep
+        """
+        if isinstance(state_A, str):
+            state_A = self.get_state_index(state_A)
+        if isinstance(state_B, str):
+            state_B = self.get_state_index(state_B)
+        passage_all = self.passage_cycle_correct.get_passage_ij(state_A, state_B)
+        min_pass_jump = min(list(passage_all.keys()), key=abs)
+        return passage_all[min_pass_jump]
 
 
-                        # without cycle correction
-                        r_AB_npass,    r_BA_npass    = rate_n_passage[i, j], rate_n_passage[j, i]
-                        r_AB_inv_mfpt, r_BA_inv_mfpt = rate_inv_mfpt[i, j],  rate_inv_mfpt[j, i]
-                        rate_AB.append([r_AB_npass,  r_AB_inv_mfpt, ])
-                        rate_BA.append([r_BA_npass,  r_BA_inv_mfpt, ])
+    def get_mfpt_AB_shortest_passage(self, state_A, state_B):
+        """
+        Get the passage info from state_A to state_B.
+        passage_A_to_B can correspond to different jumps. WKK0KW to KK0KKW can be -2 or +5. This function will only
+        return the passage mfpt for the shortest passage. For example, -2 for WKK0KW to KK0KKW.
+        :param state_A: str or int
+        :param state_B: str or int
+        :return: mfpt, mfpt_alltraj
+            mfpt : float, the mean first passage time from state_A to state_B (average over all replicas).
+            mfpt_alltraj : a list of float, the mean first passage time from state_A to state_B in each replica.
+        """
+        (length, start, end) = self.get_passage_AB_shortest(state_A, state_B)
+        mfpt = np.concatenate(length).mean() * self.time_step
+        mfpt_alltraj =[np.mean(l)* self.time_step for l in length]
+        return mfpt, mfpt_alltraj
 
-                        # with cycle correction
-                        task_list.append((i, j, perm_list))
-
-                        d_ab, d_ba = k_distance(self.state_map_int_2_s[i], self.state_map_int_2_s[j])
-                        dist_AB.append(d_ab)
-                        dist_BA.append(d_ba)
-        # parallelization
-        with ProcessPoolExecutor(max_workers=n_cpu) as executor:
-            futures = []
-            for p in task_list:
-                future = executor.submit(self._cycle_correct, p)
-                futures.append(future)
-
-            for future in futures:
-                r_AB_npass_cc, r_BA_npass_cc, r_AB_inv_mfpt_cc, r_BA_inv_mfpt_cc = future.result()
-                rate_AB_cc.append([r_AB_npass_cc, r_AB_inv_mfpt_cc])
-                rate_BA_cc.append([r_BA_npass_cc, r_BA_inv_mfpt_cc])
-        self.raw_traj_df = pd.DataFrame({"index_A": index_A, "index_B": index_B, "A": A_list, "B": B_list,
-                                         "A_proportion": A_proportion, "B_proportion": B_proportion,
-                                         "net_flux_AB": net_flux_AB, "flux_AB": flux_AB, "flux_BA": flux_BA,
-                                         "rate_AB_npass":    [i[0] for i in rate_AB],
-                                         "rate_AB_inv_mfpt": [i[1] for i in rate_AB],
-                                         "rate_BA_npass":    [i[0] for i in rate_BA],
-                                         "rate_BA_inv_mfpt": [i[1] for i in rate_BA],
-                                         "rate_ABcc_npass":    [i[0] for i in rate_AB_cc],
-                                         "rate_ABcc_inv_mfpt": [i[1] for i in rate_AB_cc],
-                                         "rate_BAcc_npass":    [i[0] for i in rate_BA_cc],
-                                         "rate_BAcc_inv_mfpt": [i[1] for i in rate_BA_cc],
-                                         "dist_AB": dist_AB, "dist_BA": dist_BA})
-        self.raw_traj_df["rate_AB_x_rate_BA"] = self.raw_traj_df["rate_ABcc_inv_mfpt"] * self.raw_traj_df["rate_BAcc_inv_mfpt"]
-        self.raw_traj_df = self.raw_traj_df.sort_values(by='rate_AB_x_rate_BA', ascending=False)
-        return self.raw_traj_df
-
-    def rate_cycle_correct(self, ind_i, ind_j, perm_list):
-        rep_index_list = []
-        passage_index_list = []
-        passage_time = []
-        half_p_count = []
-
-        for rep in range(len(perm_list)):
-            pt_len = self.passage_time_length_alltraj_raw[rep][ind_i][ind_j]
-            pt_point = self.passage_time_point_alltraj_raw[rep][ind_i][ind_j]
-            perm_array = perm_list[rep][["enter", "time"]].to_numpy()  # unit in ps. up/down will be ignored
-
-            for i_passage, (end, length) in enumerate(zip(pt_point, pt_len)):
-                start = end - length  # unit in frame
-                passage_index_list.append(i_passage)
-                rep_index_list.append(rep)
-                passage_time.append(length * self.time_step)
-                half_p_count.append(np.sum(np.logical_and(perm_array > start * self.time_step,
-                                                          perm_array < end * self.time_step)))  # convert unit to ps
-        Df_ij = pd.DataFrame({"replica": rep_index_list,
-                              "passage_index": passage_index_list,
-                              "passage_time": passage_time,
-                              "h_Permeation": half_p_count,
-                              })
-        return Df_ij
-        # return Df_ij[Df_ij["h_Permeation"] <= 1].mean()["passage time"]
 
     def set_lumping_from_str(self, lumping_list, dtype=np.int16, calc_passage_time=False, letter=6):
         """

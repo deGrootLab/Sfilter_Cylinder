@@ -45,7 +45,9 @@ class MyTestCase(unittest.TestCase):
         k_model = kinetics.Sf_model(file_list)
         self.assertAlmostEqual(k_model.time_step, 2.0)
         self.assertAlmostEqual(k_model.state_distribution["WKK0KW"], 322 / 1002)
+        self.assertListEqual(k_model.state_distribution_alltraj["WKK0KW"].tolist(), [201/501, 121/501])
         self.assertAlmostEqual(k_model.state_distribution["KK0KKW"], 207 / 1002)
+        self.assertListEqual(k_model.state_distribution_alltraj["KK0KKW"].tolist(), [41 / 501, 166 / 501])
         self.assertAlmostEqual(k_model.state_distribution["WK0KKW"], 146 / 1002)
         self.assertAlmostEqual(k_model.state_distribution["KKK0KW"], 89 / 1002)
         self.assertAlmostEqual(k_model.state_distribution["WKK0KK"], 74 / 1002)
@@ -410,39 +412,34 @@ class MyTestCase(unittest.TestCase):
 
     def test_rate_cycle_correct(self):
         print("# TEST rate_cycle_correct")
-        base = Path("07-MthK/Charmm_0.75/+150mV")
-        p_event = Perm_event_output([ base / f"{i:02d}/POT_perm_event.out" for i in range(3)])
-        k_model = kinetics.Sf_model([ base / f"{i:02d}/k_cylinder.log" for i in range(3)])
-        # WKK0K0 >> WK0KK0
-        df_ij = k_model.rate_cycle_correct(0, 1, p_event.perm_list)
-        # rep 0, S6l 1 WKK0K0, S6l 38 WK0KK0
-        # rep 1, S6l 0 WKK0K0, S6l 13 WK0KK0
-        time_step = 0.20000000298023224
-        self.assertListEqual(df_ij[df_ij["h_Permeation"] != 0].to_numpy().tolist(),
-                             [[0, 0, 37*time_step, 1],
-                              [1, 0, 13*time_step, 1]])
-        for i, j in ((0,1), (1,0)):
-            print(i,j)
-            df_ij = k_model.rate_cycle_correct(i, j, p_event.perm_list)
+        base = Path("04-output_wrapper/C_0.75_2ps/05-2ps")
+        file_list = [base / f"{i:02}/analysis/04-state-code/k_cylinder.log" for i in range(2)]
+        k_model = kinetics.Sf_model(file_list)
+        self.assertEqual(k_model.get_state_index("WKK0KW"), 0)
+        self.assertEqual(k_model.get_state_index("KK0KKW"), 1)
+        answer_dict = {
+            -2: (
+                [[152, 71], [4, 11]],
+                [[3, 204], [103, 158]],
+                [[155, 275], [107, 169]]
+            ),
+            5: (
+                [[], [69]],
+                [[], [172]],
+                [[], [241]]
+            )
+        }
+        for s_i, s_j in ((0,        1),
+                         ("WKK0KW", "KK0KKW")):
+            res_dict = k_model.get_passage_AB(s_i, s_j)
+            self.assertDictEqual(res_dict, answer_dict)
+            res_short = k_model.get_passage_AB_shortest(s_i, s_j)
+            self.assertEqual(res_short, answer_dict[-2])
+            mfpt, mfpt_alltraj = k_model.get_mfpt_AB_shortest_passage(s_i, s_j)
+            self.assertAlmostEqual(mfpt, 119.0)
+            self.assertListEqual(mfpt_alltraj, [223.0, 15.0])
 
-            r_npassage_timei = k_model.rate_raw[i, j]
-            r_new = sum(df_ij["h_Permeation"] <= 1) / (k_model.state_Counter[k_model.state_map_int_2_s[i]] * k_model.time_step)
-            self.assertAlmostEqual(r_npassage_timei, r_new)
 
-            r_inv_mfpt = k_model.get_rate_inverse_mfpt()[0][i,j]
-            self.assertAlmostEqual(r_inv_mfpt, 1/df_ij["passage_time"].mean())
-
-            r_new = sum(df_ij["h_Permeation"] <= 0) / (k_model.state_Counter[k_model.state_map_int_2_s[i]] * k_model.time_step)
-            self.assertAlmostEqual(r_npassage_timei, r_new,
-                                   places=1)
-            self.assertAlmostEqual(r_inv_mfpt, 1 / df_ij[df_ij["h_Permeation"] <= 0]["passage_time"].mean(),
-                                   places=1)
-
-    def test_init_raw_properties_2(self):
-        base = Path("07-MthK/Charmm_0.75/+150mV")
-        p_event = Perm_event_output([base / f"{i:02d}/POT_perm_event.out" for i in range(3)])
-        k_model = kinetics.Sf_model([base / f"{i:02d}/k_cylinder.log" for i in range(3)])
-        k_model.init_raw_properties_2(p_event.perm_list)
 
 if __name__ == '__main__':
     unittest.main()
