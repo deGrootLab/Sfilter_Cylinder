@@ -1,8 +1,11 @@
 import copy
 import warnings
-from collections import Counter
 import numpy as np
 import pandas as pd
+from pathlib import Path
+
+from deeptime.markov.tools.flux import flux_matrix
+
 from .output_wrapper import read_k_cylinder
 from collections import Counter
 import gc
@@ -10,6 +13,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import time
 from concurrent.futures import ProcessPoolExecutor
+from .passage_cycle_correct import Passage_cycle_correct
 
 
 # inorder to run count_passage in parallel, we need to define a function count_passage_single_traj that process a single traj.
@@ -54,10 +58,10 @@ def count_passage(traj_list, num_of_node, num_workers=None):
     :param traj_list: A list of trajectory. Each trajectory is a list(np.array) of int.
     :param num_of_node: number of nodes. Assume the nodes are 0, 1, 2, ..., num_of_node-1.
     :return:
-        passage_time_length_every_traj
+        passage_time_length_alltraj
             a list of matrix. One matrix for each traj. matrix[i][j] is a list of passage time(unit in step)
             from node_i to node_j.
-        passage_time_point_every_traj
+        passage_time_point_alltraj
             a list of matrix. One matrix for each traj. matrix[i][j] is a list of time point (unit in step)
             when the passage from node_i to node_j finished .
     """
@@ -113,22 +117,22 @@ class Sf_model:
         elif isinstance(file_list, str):
             self.file_list = [file_list]
         elif isinstance(file_list, list):
-            self.file_list = file_list
+            self.file_list = [Path(f) for f in file_list]
         if traj_dtype == np.int8:
             warnings.warn("np.int8 (-128 to 127) is not safe for this application. Please use np.int16 (-32768 to 32767).")
         elif traj_dtype not in [np.int8, np.int16, np.int32, np.int64]:
             raise ValueError("traj_dtype should be np.int16, np.int32, np.int64.")
 
-        # variables for raw trajectory
+        # variables for raw trajectory (state)
         self.time_step = 0  # time step between frames
         self.total_frame = 0  # total number of frames
-        self.traj_raw = []  # raw trajectory, a list of np.array. not lumped
+        self.traj_raw_alltraj = []  # raw trajectory, a list of np.array. not lumped
         self.state_map_int_2_s = {}  # map from int to state
         self.state_map_s_2_int = {}  # map from state to int
         self.state_Counter = None  # Counter of states(str)
         self.state_distribution = {}  # proportion of each state(str)
 
-        # variables for lumped trajectory
+        # variables for lumped trajectory (node)
         self.traj_node = []  # lumped trajectory
         self.node_map_int_2_s = {}  # what does each node mean (in self.traj_lumped). key:int, value: list of str
         self.node_map_s_2_int = {}  # Which node does a state belong to (in self.traj_lumped). key:str, value: int
@@ -138,20 +142,21 @@ class Sf_model:
 
         # variables for properties
         self.lag_step = lag_step  # lag step for computing properties
-        self.flux_matrix = None
-        self.flux_matrix_every_traj = None
-        self.flux_raw = None  # raw traj
-        self.net_flux_raw = None  # raw traj
-        self.transition_probability_matrix = None
-        self.transition_probability_matrix_every_traj = None
-        self.net_flux_matrix = None
-        self.net_flux_matrix_every_traj = None
-        self.passage_time_point_every_traj = None  # lumped traj
-        self.passage_time_length_every_traj = None  # lumped traj
-        self.passage_time_point_every_traj_raw = None  # lumped traj
-        self.passage_time_length_every_traj_raw = None  # raw traj
+        # flux
+        self.flux_matrix,     self.flux_matrix_alltraj = None, None # lumped traj (nodes)
+        self.net_flux_matrix, self.net_flux_matrix_alltraj = None, None
+        self.flux_matrix_raw,     self.flux_matrix_raw_alltraj = None, None # raw traj (states)
+        self.net_flux_matrix_raw, self.net_flux_matrix_raw_alltraj = None, None
+
+        self.transition_probability_matrix = None # lumped traj (nodes)
+        self.transition_probability_matrix_alltraj = None
+
+        self.passage_time_point_alltraj = None  # lumped traj
+        self.passage_time_length_alltraj = None  # lumped traj
+        self.passage_time_point_alltraj_raw = None  # raw traj
+        self.passage_time_length_alltraj_raw = None  # raw traj
+        self.jump_array_alltraj = []
         self.rate_raw = None
-        self.mechanism_G = None
 
         # initialization finished
 
@@ -164,7 +169,17 @@ class Sf_model:
             state_index = 0
             for file in self.file_list:
                 print(file)
-                traj, meta_data, K_occupency, W_occupency = read_k_cylinder(file, method, get_occu=False)
+                # if the cached jump file exists, use it. otherwise used get_jump. It should be in the same folder as the file.
+                if file.with_suffix(".jump_np_array.npy").exists():
+                    traj, meta_data, K_occ, W_occ = read_k_cylinder(file, method, get_occu=False)
+                    jump_array = np.load(file.with_suffix(".jump_np_array.npy"))
+                    if len(jump_array) != len(traj):
+                        raise ValueError(f"The cached jump file is broken. Please delete it and rerun. {file.with_suffix('.jump_np_array.npy')}")
+                    self.jump_array_alltraj.append(jump_array)
+                else :
+                    traj, meta_data, K_occ, W_occ, jump_array = read_k_cylinder(file, method, get_occu=True, get_jump=True)
+                    self.jump_array_alltraj.append(jump_array)
+                    np.save(file.with_suffix(".jump_np_array.npy"), jump_array)
                 time_step_list.append(meta_data["time_step"])
                 unique_state = sorted(set(traj))
                 for s in unique_state:
@@ -176,8 +191,6 @@ class Sf_model:
                 traj_int = np.array([map_s_2_int[s] for s in traj], dtype=traj_dtype)
                 traj_tmp_list.append(traj_int)
                 del traj  # free memory
-                del K_occupency
-                del W_occupency
                 gc.collect()
             # check if time step (float) is almost the same
             if not np.allclose(time_step_list, time_step_list[0]):
@@ -188,6 +201,12 @@ class Sf_model:
             t3 = time.time()
             self.raw_traj_df = None
             self._init_raw_properties(dtype_lumped=traj_dtype)
+            self.passage_cycle_correct = Passage_cycle_correct(self.traj_raw_alltraj,
+                                                               self.passage_time_length_alltraj_raw,
+                                                               self.passage_time_point_alltraj_raw,
+                                                               self.jump_array_alltraj, self.time_step)
+            # this is a class that saves the rate_ij (mfpt or passage) with cycle correction.
+            # User should not use this directly.
             t4 = time.time()
             if print_time:
                 print("load files                (s):", t2 - t0)
@@ -217,9 +236,9 @@ class Sf_model:
             self.node_map_int_2_s[i] = [s]
             self.node_map_s_2_int[s] = i
 
-        self.traj_raw = []
+        self.traj_raw_alltraj = []
         for traj in traj_list:
-            self.traj_raw.append(np.array([self.state_map_s_2_int[s] for s in traj], dtype=dtype))
+            self.traj_raw_alltraj.append(np.array([self.state_map_s_2_int[s] for s in traj], dtype=dtype))
 
         if init_raw_properties:
             self._init_raw_properties(dtype_lumped=dtype_lumped)
@@ -254,62 +273,97 @@ class Sf_model:
             self.node_map_s_2_int[map_int_2_s[i_old]] = i_new
             map_old_2_new[i_old] = i_new
         # update traj_list
-        self.traj_raw = []
+        self.traj_raw_alltraj = []
         for traj in traj_list:
-            self.traj_raw.append(np.array([map_old_2_new[i] for i in traj], dtype=dtype))
+            self.traj_raw_alltraj.append(np.array([map_old_2_new[i] for i in traj], dtype=dtype))
 
         if init_raw_properties:
             self._init_raw_properties(dtype_lumped=dtype)
 
     def _init_raw_properties(self, dtype_lumped=np.int16):
+        """
+        Initialize the basic properties of the raw trajectory.
+        This should only be used in the initialization, when the raw trajectory is set.
+        :param dtype_lumped: default is np.int16 (-32768 to 32767).
+        The following properties will be calculated:
+        self.flux_matrix_raw, self.flux_matrix_raw_alltraj
+            self.flux_matrix_raw[i,j] is the number of flux from node i to node j.
+            self.flux_matrix_raw_alltraj[rep][i,j] is the number of flux from node i to node j in the rep-th traj.
+
+        self.net_flux_matrix_raw, self.net_flux_matrix_raw_alltraj
+            self.net_flux_matrix_raw[i,j] is the net flux from state i to state j.
+            self.net_flux_matrix_raw_alltraj[rep][i,j] is the net flux from state i to state j in the rep-th traj.
+
+        self.passage_time_length_alltraj_raw : A list of 2D list
+            self.passage_time_length_alltraj_raw[rep][i][j] is the passage time (unit in step) from state i to state j in
+            the rep-th traj.
+
+        self.passage_time_point_alltraj_raw : A list of 2D list
+            self.passage_time_point_alltraj_raw[rep][i][j] is the time point (unit in step) when the passage from
+            state i to state j finished in the rep-th traj.
+        :return: None
+        """
+        self.calc_flux_raw()
+        # self.flux_matrix_raw, self.flux_matrix_raw_alltraj
+        # self.net_flux_matrix_raw, self.net_flux_matrix_raw_alltraj will be updated
         self.set_lumping_from_str([], dtype_lumped, calc_passage_time=False)  # At the end of this function, properties will be calculated.
-        self.flux_raw = copy.deepcopy(self.flux_matrix)
-        self.net_flux_raw = copy.deepcopy(self.net_flux_matrix)
         self.calc_passage_time()
-        self.passage_time_length_every_traj_raw = copy.deepcopy(self.passage_time_length_every_traj)
-        self.passage_time_point_every_traj_raw = copy.deepcopy(self.passage_time_point_every_traj)
+        self.passage_time_length_alltraj_raw = copy.deepcopy(self.passage_time_length_alltraj)
+        self.passage_time_point_alltraj_raw = copy.deepcopy(self.passage_time_point_alltraj)
         self.rate_raw, _ = self.get_rate_passage_time(traj_type="raw")
 
-        # build a DataFrame for the raw traj
-        index_A = []
-        index_B = []
-        index_pair = []
-        A_list = []
-        B_list = []
-        A_proportion = []
-        B_proportion = []
-        net_flux_AB = []
-        flux_AB = []
-        flux_BA = []
-        rate_AB = []
-        rate_BA = []
-        dist_AB = []
-        dist_BA = []
-        for i in range(len(self.net_flux_raw)):
-            for j in range(len(self.net_flux_raw)):
-                if i != j:
-                    if self.flux_raw[i, j] > 0 and self.net_flux_raw[i, j] >= 0 and ((j, i) not in index_pair):
-                        index_pair.append((i, j))
-                        index_A.append(i)
-                        index_B.append(j)
-                        A_list.append(self.state_map_int_2_s[i])
-                        B_list.append(self.state_map_int_2_s[j])
-                        A_proportion.append(self.state_distribution[self.state_map_int_2_s[i]])
-                        B_proportion.append(self.state_distribution[self.state_map_int_2_s[j]])
-                        net_flux_AB.append(self.net_flux_raw[i, j])
-                        flux_AB.append(self.flux_raw[i, j])
-                        flux_BA.append(self.flux_raw[j, i])
-                        rate_AB.append(self.rate_raw[i, j])
-                        rate_BA.append(self.rate_raw[j, i])
-                        d_ab, d_ba = k_distance(self.state_map_int_2_s[i], self.state_map_int_2_s[j])
-                        dist_AB.append(d_ab)
-                        dist_BA.append(d_ba)
-        self.raw_traj_df = pd.DataFrame({"index_A": index_A, "index_B": index_B, "A": A_list, "B": B_list,
-                                         "A_proportion": A_proportion, "B_proportion": B_proportion,
-                                         "net_flux_AB": net_flux_AB, "flux_AB": flux_AB, "flux_BA": flux_BA,
-                                         "rate_AB": rate_AB, "rate_BA": rate_BA,
-                                         "dist_AB": dist_AB, "dist_BA": dist_BA})
-        self.raw_traj_df["rate_AB_x_rate_BA"] = self.raw_traj_df["rate_AB"] * self.raw_traj_df["rate_BA"]
+        # # build a DataFrame for the raw traj
+        # index_A = []
+        # index_B = []
+        # index_pair = []
+        # A_list = []
+        # B_list = []
+        # A_proportion = []
+        # B_proportion = []
+        # net_flux_AB = []
+        # flux_AB = []
+        # flux_BA = []
+        # rate_AB = []
+        # rate_BA = []
+        # dist_AB = []
+        # dist_BA = []
+        # for i in range(len(self.flux_matrix_raw)):
+        #     for j in range(len(self.flux_matrix_raw)):
+        #         if i != j:
+        #             if self.flux_matrix_raw[i, j] > 0 and self.net_flux_matrix_raw[i, j] >= 0 and ((j, i) not in index_pair):
+        #                 index_pair.append((i, j))
+        #                 index_A.append(i)
+        #                 index_B.append(j)
+        #                 A_list.append(self.state_map_int_2_s[i])
+        #                 B_list.append(self.state_map_int_2_s[j])
+        #                 A_proportion.append(self.state_distribution[self.state_map_int_2_s[i]])
+        #                 B_proportion.append(self.state_distribution[self.state_map_int_2_s[j]])
+        #                 net_flux_AB.append(self.net_flux_raw[i, j])
+        #                 flux_AB.append(self.flux_matrix_raw[i, j])
+        #                 flux_BA.append(self.flux_matrix_raw[j, i])
+        #                 rate_AB.append(self.rate_raw[i, j])
+        #                 rate_BA.append(self.rate_raw[j, i])
+        #                 d_ab, d_ba = k_distance(self.state_map_int_2_s[i], self.state_map_int_2_s[j])
+        #                 dist_AB.append(d_ab)
+        #                 dist_BA.append(d_ba)
+        # self.raw_traj_df = pd.DataFrame({"index_A": index_A, "index_B": index_B, "A": A_list, "B": B_list,
+        #                                  "A_proportion": A_proportion, "B_proportion": B_proportion,
+        #                                  "net_flux_AB": net_flux_AB, "flux_AB": flux_AB, "flux_BA": flux_BA,
+        #                                  "rate_AB": rate_AB, "rate_BA": rate_BA,
+        #                                  "dist_AB": dist_AB, "dist_BA": dist_BA})
+        # self.raw_traj_df["rate_AB_x_rate_BA"] = self.raw_traj_df["rate_AB"] * self.raw_traj_df["rate_BA"]
+
+    def get_state_index(self, state):
+        pass
+
+    def get_flux_AB(self, state_A, state_B):
+        pass
+
+    def get_concentration(self, state):
+        pass
+
+    def get_mfpt_AB(self, state_A, state_B):
+        pass
 
     def _cycle_correct(self, p ):
         i, j, perm_list = p
@@ -343,7 +397,7 @@ class Sf_model:
         self.flux_raw = copy.deepcopy(self.flux_matrix)
         self.net_flux_raw = copy.deepcopy(self.net_flux_matrix)
 
-        self.passage_time_length_every_traj_raw = copy.deepcopy(self.passage_time_length_every_traj)
+        self.passage_time_length_alltraj_raw = copy.deepcopy(self.passage_time_length_alltraj)
         rate_n_passage = self.get_rate_passage_time(traj_type="raw")[0]
         rate_inv_mfpt  = self.get_rate_inverse_mfpt(traj_type="raw")[0]
 
@@ -396,9 +450,6 @@ class Sf_model:
                         # with cycle correction
                         task_list.append((i, j, perm_list))
 
-
-
-
                         d_ab, d_ba = k_distance(self.state_map_int_2_s[i], self.state_map_int_2_s[j])
                         dist_AB.append(d_ab)
                         dist_BA.append(d_ba)
@@ -436,8 +487,8 @@ class Sf_model:
         half_p_count = []
 
         for rep in range(len(perm_list)):
-            pt_len = self.passage_time_length_every_traj_raw[rep][ind_i][ind_j]
-            pt_point = self.passage_time_point_every_traj_raw[rep][ind_i][ind_j]
+            pt_len = self.passage_time_length_alltraj_raw[rep][ind_i][ind_j]
+            pt_point = self.passage_time_point_alltraj_raw[rep][ind_i][ind_j]
             perm_array = perm_list[rep][["enter", "time"]].to_numpy()  # unit in ps. up/down will be ignored
 
             for i_passage, (end, length) in enumerate(zip(pt_point, pt_len)):
@@ -503,11 +554,11 @@ class Sf_model:
                 self.node_map_s_2_int[s] = i
         # update self.traj_node
         self.traj_node = []
-        # for traj in self.traj_raw: # this is slow
+        # for traj in self.traj_raw_alltraj: # this is slow
         #     self.traj_node.append(
         #         np.array([self.node_map_s_2_int[self.state_map_int_2_s[si]] for si in traj], dtype=dtype))
         node_map_vectorized = np.vectorize(lambda si: self.node_map_s_2_int[self.state_map_int_2_s[si]])
-        self.traj_node = [node_map_vectorized(traj).astype(dtype) for traj in self.traj_raw]
+        self.traj_node = [node_map_vectorized(traj).astype(dtype) for traj in self.traj_raw_alltraj]
         # update self.node_Counter
         self.node_Counter = Counter([])
         for traj in self.traj_node:
@@ -516,12 +567,11 @@ class Sf_model:
         # calculate properties
         self.calc_flux_matrix()
         self.calc_transition_probability_matrix()
-        self.calc_net_flux_matrix()
         if calc_passage_time:
             self.calc_passage_time()
         else:
-            self.passage_time_point_every_traj = None  # lumped traj
-            self.passage_time_length_every_traj = None  # lumped traj
+            self.passage_time_point_alltraj = None  # lumped traj
+            self.passage_time_length_alltraj = None  # lumped traj
 
 
 
@@ -542,38 +592,78 @@ class Sf_model:
 
     def get_traj_in_string(self):
         """
-        Get the trajectory in string format. To save memory, the state is represented by int in self.traj_raw.
+        Get the trajectory in string format. To save memory, the state is represented by int in self.traj_raw_alltraj.
         :return: a list of traj, the state is represented by string.
         """
-        return [[self.state_map_int_2_s[i] for i in traj] for traj in self.traj_raw]
+        return [[self.state_map_int_2_s[i] for i in traj] for traj in self.traj_raw_alltraj]
+
+    def calc_flux_raw(self):
+        """
+        Calculate the flux matrix on the raw trajectory.
+        flux_matrix_raw[i, j] is the flux from state i to state j.
+        :return: flux_matrix_raw, a np.array of size (n, n).
+        """
+        # flux
+        num_of_state = len(self.state_map_int_2_s)
+        flux_matrix_raw_alltraj = [np.zeros((num_of_state, num_of_state), dtype=np.int64) for i in range(len(self.traj_raw_alltraj))]
+        for i, traj in enumerate(self.traj_raw_alltraj):
+            state_start = traj[:-self.lag_step]
+            state_end = traj[self.lag_step:]
+            unique, counts = np.unique(np.vstack((state_start, state_end)).T, axis=0, return_counts=True)
+            flux_matrix_raw_alltraj[i][unique[:, 0], unique[:, 1]] += counts
+        flux_matrix_raw = np.sum(flux_matrix_raw_alltraj, axis=0)
+        self.flux_matrix_raw, self.flux_matrix_raw_alltraj = (flux_matrix_raw,flux_matrix_raw_alltraj)
+
+        # net flux
+        self.net_flux_matrix_raw_alltraj = [np.zeros((num_of_state, num_of_state), dtype=np.int64) for i in range(len(self.traj_raw_alltraj))]
+        for rep, traj in enumerate(self.traj_raw_alltraj):
+            for s_i in range(num_of_state):
+                for s_j in range(num_of_state):
+                    self.net_flux_matrix_raw_alltraj[rep][s_i, s_j] = flux_matrix_raw_alltraj[rep][s_i, s_j] - flux_matrix_raw_alltraj[rep][s_i, s_j]
+        self.net_flux_matrix_raw = np.sum(self.net_flux_matrix_raw_alltraj, axis=0)
+        return self.flux_matrix_raw, self.flux_matrix_raw_alltraj
+
 
     def calc_flux_matrix(self):
         """
-        Calculate the flux matrix. The flux matrix is a matrix of size (n, n), where n is the number of nodes.
-        flux_matrix[i, j] is the flux from node i to node j.
-        :return: flux_matrix, a np.array of size (n, n).
+        Calculate the flux matrix.
+        Based on what states are lumped, calculate the flux matrix.
+        :return:
+            flux_matrix, a np.array of size (n, n).
+            flux_matrix_alltraj, a list of np.array of size (n, n). Each element is a flux matrix of one trajectory.
         """
-        num_of_node = len(self.node_map_int_2_s)
-        flux_matrix_alltraj = []
-        for traj in self.traj_node:
-            flux_matrix_tmp = np.zeros((num_of_node, num_of_node), dtype=np.int64)
-            node_start = traj[:-self.lag_step]
-            node_end = traj[self.lag_step:]
-            unique, counts = np.unique(np.vstack((node_start, node_end)).T, axis=0, return_counts=True)
-            flux_matrix_tmp[unique[:, 0], unique[:, 1]] = counts
-            flux_matrix_alltraj.append(flux_matrix_tmp)
-        flux_matrix_alltraj = np.array(flux_matrix_alltraj)
-        flux_matrix = np.sum(flux_matrix_alltraj, axis=0)
-        self.flux_matrix_every_traj = flux_matrix_alltraj
-        self.flux_matrix = flux_matrix
-        return flux_matrix
+        node_num = len(self.node_map_int_2_s)
+        flux_matrix = np.zeros((node_num, node_num), dtype=np.int64)
+        flux_matrix_alltraj = [np.zeros((node_num, node_num), dtype=np.int64) for i in range(len(self.traj_node))]
+        # the flux from node_i(state i1, i2) to node_j(state j1, j2) is the sum of flux from i1 to j1, i1 to j2, i2 to j1, i2 to j2
+        for rep in range(len(self.traj_node)):
+            for node_i in range(node_num):
+                for node_j in range(node_num):
+                    for s_i in self.node_map_int_2_s[node_i]:
+                        for s_j in self.node_map_int_2_s[node_j]:
+                            flux_matrix_alltraj[rep][node_i, node_j] += np.sum(
+                                self.flux_matrix_raw_alltraj[rep][self.state_map_s_2_int[s_i], self.state_map_s_2_int[s_j]])
+
+
+        flux_matrix[:] = np.sum(flux_matrix_alltraj, axis=0)
+        self.flux_matrix, self.flux_matrix_alltraj = flux_matrix, flux_matrix_alltraj
+        # net flux
+        self.net_flux_matrix = np.zeros((node_num, node_num), dtype=np.int64)
+        self.net_flux_matrix_alltraj = [np.zeros((node_num, node_num), dtype=np.int64) for i in range(len(self.traj_node))]
+        for rep in range(len(self.traj_node)):
+            for i in range(node_num):
+                for j in range(node_num):
+                    self.net_flux_matrix_alltraj[rep][i, j] = flux_matrix_alltraj[rep][i, j] - flux_matrix_alltraj[rep][j, i]
+        self.net_flux_matrix = np.sum(self.net_flux_matrix_alltraj, axis=0)
+
+        return self.flux_matrix, self.flux_matrix_alltraj
 
     def calc_transition_probability_matrix(self):
         """
         Calculate the transition probability matrix.
         :return:
         """
-        if self.flux_matrix is None or self.flux_matrix_every_traj is None:
+        if self.flux_matrix is None or self.flux_matrix_alltraj is None:
             self.calc_flux_matrix()
 
         num_of_node = len(self.node_map_int_2_s)
@@ -584,15 +674,15 @@ class Sf_model:
                 self.transition_probability_matrix[i, :] = 0
             else:
                 self.transition_probability_matrix[i, :] = self.flux_matrix[i, :] / flux_sum
-        self.transition_probability_matrix_every_traj = np.zeros(
-            (len(self.flux_matrix_every_traj), num_of_node, num_of_node))
-        for traj_i, flux_i in enumerate(self.flux_matrix_every_traj):
+        self.transition_probability_matrix_alltraj = np.zeros(
+            (len(self.flux_matrix_alltraj), num_of_node, num_of_node))
+        for traj_i, flux_i in enumerate(self.flux_matrix_alltraj):
             for i in range(num_of_node):
                 flux_sum = np.sum(flux_i[i, :])
                 if flux_sum == 0:
-                    self.transition_probability_matrix_every_traj[traj_i, i, :] = 0
+                    self.transition_probability_matrix_alltraj[traj_i, i, :] = 0
                 else:
-                    self.transition_probability_matrix_every_traj[traj_i, i, :] = flux_i[i, :] / flux_sum
+                    self.transition_probability_matrix_alltraj[traj_i, i, :] = flux_i[i, :] / flux_sum
 
         return self.transition_probability_matrix
 
@@ -601,46 +691,43 @@ class Sf_model:
         Calculate the net flux matrix.
         :return:
         """
-        if self.flux_matrix is None or self.flux_matrix_every_traj is None:
+        if self.flux_matrix is None or self.flux_matrix_alltraj is None:
             self.calc_flux_matrix()
-        num_of_node = len(self.node_map_int_2_s)
-        net_flux_matrix = np.zeros((num_of_node, num_of_node), dtype=np.int64)
-        for i in range(num_of_node):
-            for j in range(i + 1, num_of_node):
-                net_flux_matrix[i, j] = self.flux_matrix[i, j] - self.flux_matrix[j, i]
-                net_flux_matrix[j, i] = -net_flux_matrix[i, j]
-        self.net_flux_matrix = net_flux_matrix
-        self.net_flux_matrix_every_traj = np.zeros((len(self.flux_matrix_every_traj), num_of_node, num_of_node),
-                                                   dtype=np.int64)
-        for traj_i, flux_i in enumerate(self.flux_matrix_every_traj):
-            for i in range(num_of_node):
-                for j in range(i + 1, num_of_node):
-                    self.net_flux_matrix_every_traj[traj_i, i, j] = flux_i[i, j] - flux_i[j, i]
-                    self.net_flux_matrix_every_traj[traj_i, j, i] = -self.net_flux_matrix_every_traj[traj_i, i, j]
 
-        return net_flux_matrix
+        node_num = len(self.node_map_int_2_s)
+        self.net_flux_matrix = np.zeros((node_num, node_num), dtype=np.int64)
+        self.net_flux_matrix_alltraj = [np.zeros((node_num, node_num), dtype=np.int64) for i in
+                                        range(len(self.traj_node))]
+        for rep in range(len(self.traj_node)):
+            for i in range(node_num):
+                for j in range(node_num):
+                    self.net_flux_matrix_alltraj[rep][i, j] = self.flux_matrix_alltraj[rep][i, j] - self.flux_matrix_alltraj[rep][
+                        j, i]
+        self.net_flux_matrix = np.sum(self.net_flux_matrix_alltraj, axis=0)
+
+        return self.net_flux_matrix, self.net_flux_matrix_alltraj
 
     def calc_passage_time(self):
         """
         Calculate the passage time from every node to every node. This function does not respond to self.lag_step.
-        :return: passage_time_length_every_traj
+        :return: passage_time_length_alltraj
             A list of matrix. One matrix for each traj.
             matrix[i][j] is a list of passage time from node_i to node_j.
         """
         passage_time_len, passage_time_point = count_passage(self.traj_node, len(self.node_map_int_2_s))
-        self.passage_time_length_every_traj = passage_time_len
-        self.passage_time_point_every_traj = passage_time_point
+        self.passage_time_length_alltraj = passage_time_len
+        self.passage_time_point_alltraj = passage_time_point
         return passage_time_len
 
     def calc_passage_time_raw(self):
         """
         Calculate the passage time from every state to every state on raw traj. This function does not respond to self.lag_step.
-        :return: passage_time_length_every_traj
+        :return: passage_time_length_alltraj
             A list of matrix. One matrix for each traj.
             matrix[i][j] is a list of passage time from node_i to node_j.
         """
-        passage_time_len, passage_time_point = count_passage(self.traj_raw, len(self.state_map_int_2_s))
-        self.passage_time_length_every_traj_raw = passage_time_len
+        passage_time_len, passage_time_point = count_passage(self.traj_raw_alltraj, len(self.state_map_int_2_s))
+        self.passage_time_length_alltraj_raw = passage_time_len
         return passage_time_len
 
     def get_time_step(self):
@@ -670,22 +757,22 @@ class Sf_model:
 
     def get_mfpt(self, traj_type="lumped"):
         """
-        Compute and return the mfpt from self.passage_time_length_every_traj
+        Compute and return the mfpt from self.passage_time_length_alltraj
         :param traj_type: "lumped" or "raw"
         :return: mfpt, a np.array of size (n, n), mfpt from every node to every node.
                  mfpt_every_traj, mfpt for individual traj.
         """
         if traj_type == "raw":
-            if self.passage_time_length_every_traj_raw is None:
-                warnings.warn("self.passage_time_length_every_traj_raw is None. Calculating passage time.")
+            if self.passage_time_length_alltraj_raw is None:
+                warnings.warn("self.passage_time_length_alltraj_raw is None. Calculating passage time.")
                 self.calc_passage_time_raw()
-            passage_time = self.passage_time_length_every_traj_raw
+            passage_time = self.passage_time_length_alltraj_raw
             node_num_length = len(self.state_map_int_2_s)
         elif traj_type == "lumped":
-            if self.passage_time_length_every_traj is None:
-                warnings.warn("self.passage_time_length_every_traj is None. Calculating passage time.")
+            if self.passage_time_length_alltraj is None:
+                warnings.warn("self.passage_time_length_alltraj is None. Calculating passage time.")
                 self.calc_passage_time()
-            passage_time = self.passage_time_length_every_traj
+            passage_time = self.passage_time_length_alltraj
             node_num_length = len(self.node_map_int_2_s)
         else:
             raise ValueError("traj_type should be 'lumped' or 'raw'.")
@@ -747,19 +834,19 @@ class Sf_model:
                  rate_every_traj, a list of rate for individual traj.
         """
         if traj_type == "raw":
-            if self.passage_time_length_every_traj_raw is None:
-                warnings.warn("self.passage_time_length_every_traj_raw is None. Calculating passage time.")
+            if self.passage_time_length_alltraj_raw is None:
+                warnings.warn("self.passage_time_length_alltraj_raw is None. Calculating passage time.")
                 self.calc_passage_time_raw()
-            passage_time = self.passage_time_length_every_traj_raw
+            passage_time = self.passage_time_length_alltraj_raw
             node_num_length = len(self.state_map_int_2_s)
             # counter = self.state_Counter
-            counter = Counter([i for traj in self.traj_raw for i in traj])
-            traj_list = self.traj_raw
+            counter = Counter([i for traj in self.traj_raw_alltraj for i in traj])
+            traj_list = self.traj_raw_alltraj
         elif traj_type == "lumped":
-            if self.passage_time_length_every_traj is None:
-                warnings.warn("self.passage_time_length_every_traj is None. Calculating passage time.")
+            if self.passage_time_length_alltraj is None:
+                warnings.warn("self.passage_time_length_alltraj is None. Calculating passage time.")
                 self.calc_passage_time()
-            passage_time = self.passage_time_length_every_traj
+            passage_time = self.passage_time_length_alltraj
             node_num_length = len(self.node_map_int_2_s)
             counter = self.node_Counter
             traj_list = self.traj_node
@@ -787,36 +874,6 @@ class Sf_model:
             rate_every_traj.append(rate_tmp)
         return rate, rate_every_traj
 
-    def build_graph(self, letter=6):
-        """
-        :param letter: int, the number of binding sites to use.
-            4: S1 - S4
-            5: S0 - S4
-            6: S0 - S5
-        build a graph using networkx.
-            if the net flux from i to j is larger than 0, there will be an edge from i to j.
-            Each edge has attributes
-                net_flux,
-                flux_ij,
-                flux_ji,
-                distance_ij,
-                distance_ji,
-        :return:
-        """
-        # rate, _ = self.get_rate_passage_time()
-        self.mechanism_G = Mechanism_Graph(
-            self.net_flux_matrix, self.flux_matrix, self.net_flux_raw, self.flux_raw, self.state_distribution, self.node_distribution,
-            self.node_map_int_2_s, self.node_map_s_2_int, self.state_map_int_2_s, self.state_map_s_2_int, self.raw_traj_df,
-            letter)
-
-    def update_graph_rate(self):
-        """
-        Update rate to the graph
-        :return:
-        """
-        # rate, _ = self.get_rate_passage_time()
-        # self.mechanism_G.set_graph_rate(rate)
-        self.mechanism_G.set_graph_rate_df(self.raw_traj_df, self.node_map_int_2_s)
 
 
 def k_distance(A, B):
@@ -854,9 +911,7 @@ class Mechanism_Graph:
 
     """
 
-    def __init__(self, net_flux, flux, net_flux_raw, flux_raw, state_distribution, node_distribution,
-                 node_map_int_2_s, node_map_s_2_int, state_map_int_2_s, state_map_s_2_int, raw_traj_df,
-                 letter):
+    def __init__(self, model):
         """
         :param net_flux:
         :param flux:
@@ -872,24 +927,16 @@ class Mechanism_Graph:
             5: S0 - S4
             6: S0 - S5
         """
-        self.net_flux_raw = net_flux_raw
-        self.flux_raw = flux_raw
-        self.net_flux = net_flux
-        self.flux = flux
-        self.node_map_int_2_s = node_map_int_2_s
-        self.node_map_s_2_int = node_map_s_2_int
-        self.state_distribution = state_distribution
-        self.node_distribution = node_distribution
-        self.state_map_int_2_s = state_map_int_2_s
-        self.state_map_s_2_int = state_map_s_2_int
-        self.raw_traj_df = raw_traj_df
-        self.letter = letter
-        self.rate = None
+        if isinstance(model, Sf_model):
+            self.model = model
+        else:
+            raise ValueError("model should be an instance of Sf_model.")
+
         # build a DiGraph
         self.G = nx.DiGraph()
-        self.G.add_nodes_from(range(len(node_map_int_2_s)))
-        for i in range(len(node_map_int_2_s)):
-            for j in range(len(node_map_int_2_s)):
+        self.G.add_nodes_from(range(len(self.model.node_map_int_2_s)))
+        for i in range(len(self.model.node_map_int_2_s)):
+            for j in range(len(self.model.node_map_int_2_s)):
                 if flux[i, j] > 0 and i != j and net_flux[i, j] >= 0:
 
                     # pick i,j that has the maximum flux
@@ -991,45 +1038,7 @@ class Mechanism_Graph:
         """
         return np.sum([self.state_distribution[s] for s in self.node_map_int_2_s[node]])
 
-    def get_info_df(self):
-        """
-        Get all the edge information in a DataFrame.
-        :return: pd.DataFrame
-        """
-        index_A = []
-        index_B = []
-        A_list = []
-        B_list = []
-        A_proportion = []
-        B_proportion = []
-        net_flux_AB = []
-        flux_AB = []
-        flux_BA = []
-        rate_AB = []
-        rate_BA = []
-        dist_AB = []
-        dist_BA = []
-        for i, j, data in self.G.edges(data=True):
-            index_A.append(i)
-            index_B.append(j)
-            A_list.append(self.node_map_int_2_s[i])
-            B_list.append(self.node_map_int_2_s[j])
-            A_proportion.append(self.get_node_proportion(i))
-            B_proportion.append(self.get_node_proportion(j))
-            net_flux_AB.append(data["net_flux"])
-            flux_AB.append(data["flux_ij"])
-            flux_BA.append(data["flux_ji"])
-            rate_AB.append(data["rate_ij"])
-            rate_BA.append(data["rate_ji"])
-            dist_AB.append(data["distance_ij"])
-            dist_BA.append(data["distance_ji"])
-        df = pd.DataFrame({"index_A": index_A, "index_B": index_B,
-                           "A": A_list, "B": B_list, "A_proportion": A_proportion, "B_proportion": B_proportion,
-                           "net_flux_AB": net_flux_AB, "flux_AB": flux_AB, "flux_BA": flux_BA,
-                           "rate_AB": rate_AB, "rate_BA": rate_BA,
-                           "dist_AB": dist_AB, "dist_BA": dist_BA})
-        df["rate_AB_x_rate_BA"] = df["rate_AB"] * df["rate_BA"]
-        return df
+
 
     def test_lump(self, node_a, node_b):
         """

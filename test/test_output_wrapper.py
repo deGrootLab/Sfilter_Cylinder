@@ -220,7 +220,7 @@ class MyTestCase(unittest.TestCase):
 
 
     def test_read_k_cylinder_speed(self):
-        test_file = Path("/home/chui/E29Project-2023-04-11/076-MthK/20-C-POT-iso_radius/22-0.78/07_+150_0.2ps/00/analysis/08-02-1.8A/k_cylinder.log")
+        test_file = Path.home()/"E29Project-2023-04-11/076-MthK/20-C-POT-iso_radius/22-0.78/07_+150_0.2ps/00/analysis/08-02-1.8A/k_cylinder.log"
         if test_file.is_file():
             print("# TESTING read_k_cylinder, speed test... ")
             for name, flag_o, flag_j in (("get_occu=F, get_jump=F", False, False),

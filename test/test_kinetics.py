@@ -50,8 +50,8 @@ class MyTestCase(unittest.TestCase):
         self.assertAlmostEqual(k_model.state_distribution["KKK0KW"], 89 / 1002)
         self.assertAlmostEqual(k_model.state_distribution["WKK0KK"], 74 / 1002)
         self.assertEqual(k_model.total_frame, 1002)
-        self.assertListEqual(k_model.traj_raw[0][:5].tolist(), [2, 2, 2, 0, 0])
-        self.assertListEqual(k_model.traj_raw[1][:5].tolist(), [3, 1, 1, 1, 1])
+        self.assertListEqual(k_model.traj_raw_alltraj[0][:5].tolist(), [2, 2, 2, 0, 0])
+        self.assertListEqual(k_model.traj_raw_alltraj[1][:5].tolist(), [3, 1, 1, 1, 1])
 
         # lumped traj
         self.assertAlmostEqual(k_model.node_distribution[0], 322 / 1002)
@@ -69,8 +69,8 @@ class MyTestCase(unittest.TestCase):
         k_model = kinetics.Sf_model(file_list, step=2)
         self.assertAlmostEqual(k_model.time_step, 4.0)
         self.assertEqual(k_model.total_frame, 502)
-        self.assertListEqual(k_model.traj_raw[0][:3].tolist(), [2, 2, 0])
-        self.assertListEqual(k_model.traj_raw[1][:3].tolist(), [3, 1, 1])
+        self.assertListEqual(k_model.traj_raw_alltraj[0][:3].tolist(), [2, 2, 0])
+        self.assertListEqual(k_model.traj_raw_alltraj[1][:3].tolist(), [3, 1, 1])
 
     def test_set_traj_from_str(self):
         print("#TESTING: set_traj_from_str. Init an empty Sf_model class and set the traj from lists of string.")
@@ -172,21 +172,21 @@ class MyTestCase(unittest.TestCase):
         self.assertListEqual(k_model.flux_matrix.tolist(), [[6, 7, 1],
                                                             [5, 0, 2],
                                                             [0, 0, 3]])
-        self.assertListEqual(k_model.flux_matrix_every_traj[0].tolist(), [[1, 3, 0],
-                                                                          [2, 0, 1],
-                                                                          [0, 0, 1]])
+        self.assertListEqual(k_model.flux_matrix_alltraj[0].tolist(), [[1, 3, 0],
+                                                                       [2, 0, 1],
+                                                                       [0, 0, 1]])
         self.assertListEqual(k_model.transition_probability_matrix.tolist(), [[6 / 14, 7 / 14, 1 / 14],
                                                                               [5 / 7, 0, 2 / 7],
                                                                               [0, 0, 1]])
-        self.assertListEqual(k_model.transition_probability_matrix_every_traj[0].tolist(), [[1 / 4, 3 / 4, 0],
-                                                                                            [2 / 3, 0, 1 / 3],
-                                                                                            [0, 0, 1]])
+        self.assertListEqual(k_model.transition_probability_matrix_alltraj[0].tolist(), [[1 / 4, 3 / 4, 0],
+                                                                                         [2 / 3, 0, 1 / 3],
+                                                                                         [0, 0, 1]])
         self.assertListEqual(k_model.net_flux_matrix.tolist(), [[0, 2, 1],
                                                                 [-2, 0, 2],
                                                                 [-1, -2, 0]])
-        self.assertListEqual(k_model.net_flux_matrix_every_traj[0].tolist(), [[0, 1, 0],
-                                                                              [-1, 0, 1],
-                                                                              [0, -1, 0]])
+        self.assertListEqual(k_model.net_flux_matrix_alltraj[0].tolist(), [[0, 1, 0],
+                                                                           [-1, 0, 1],
+                                                                           [0, -1, 0]])
         k_model.set_lumping_from_str([("A", "B")])
         self.assertListEqual(k_model.flux_matrix.tolist(), [[18, 3],
                                                             [0, 3]])
@@ -227,7 +227,7 @@ class MyTestCase(unittest.TestCase):
         k_model = kinetics.Sf_model()
         k_model.set_traj_from_str(traj_l, time_step=1)
         k_model.calc_passage_time()
-        passage_track_alltraj = k_model.passage_time_length_every_traj
+        passage_track_alltraj = k_model.passage_time_length_alltraj
         answer = [
             [[], [5, 1], []],
             [[3, 1], [], []],
@@ -268,9 +268,8 @@ class MyTestCase(unittest.TestCase):
         k_model.set_traj_from_str(traj_l, time_step=1)
         self.assertListEqual(k_model.flux_matrix.tolist(),
                              [[5, 6, 0], [2, 2, 3], [3, 0, 0]])
-        self.assertListEqual(k_model.flux_matrix_every_traj[0].tolist(), [[4, 2, 0], [2, 2, 0], [0, 0, 0]])
-        self.assertListEqual(k_model.flux_matrix_every_traj[1].tolist(), [[1, 4, 0], [0, 0, 3], [3, 0, 0]])
-
+        self.assertListEqual(k_model.flux_matrix_alltraj[0].tolist(), [[4, 2, 0], [2, 2, 0], [0, 0, 0]])
+        self.assertListEqual(k_model.flux_matrix_alltraj[1].tolist(), [[1, 4, 0], [0, 0, 3], [3, 0, 0]])
 
     def test_get_rate_inverse_mfpt(self):
         print("#TESTING: get_rate_inverse_mfpt. This function calculate the rate from every node to every node")
@@ -384,53 +383,30 @@ class MyTestCase(unittest.TestCase):
         self.assertAlmostEqual(kinetics.k_distance(a_string, b_string)[0], -3 / 7)
         self.assertAlmostEqual(kinetics.k_distance(b_string, a_string)[0], 3 / 7)
 
-    def test_Mechanism_Graph(self):
-        print("#TESTING Graph")
-        traj = [["K0KK0", "K0KK0", "K0KK0", "K0KK0", "K0KK0",
-                 "K0KK0", "WK0K0", "WK0K0", "WK0K0", "WK0K0",
-                 "WK0K0", "WK0KK", "WKK0K", "K0KK0", "WK0K0",
-                 "WK0K0", "WK0KK", "WKK0K", "WK0KK", "WKK0K",
-                 "K0KK0", "K0KK0", "K0KK0", "K0KK0", "K0KK0",
-                 "WK0K0", "WK0KK", "WK0KK", "WKK0K", "K0KK0",
-                 "K0KK0", "K0KK0", "K0KK0", "WK0K0", "WK0KK",
-                 "WKK0K", "K0KK0"]]
-        k_model = kinetics.Sf_model()
-        k_model.set_traj_from_str(traj, time_step=1)
-        # Test if the graph is correct
-        k_model.build_graph()
-        self.assertListEqual(list(k_model.mechanism_G.G.nodes), [0, 1, 2, 3])
-        self.assertDictEqual(k_model.state_map_int_2_s, {0: "K0KK0", 1: "WK0K0", 2: "WK0KK", 3: "WKK0K"})
-        self.assertDictEqual(k_model.state_map_s_2_int, {"K0KK0": 0, "WK0K0": 1, "WK0KK": 2, "WKK0K": 3})
-        self.assertListEqual(list(k_model.mechanism_G.G.edges), [(0, 1), (1, 2), (2, 3), (3, 0)])
-        self.assertDictEqual(k_model.mechanism_G.G.edges[(0, 1)], {
-            'distance_ij': 2/6,
-            'distance_ji': -2/6,
-            'flux_ij': 4,
-            'flux_ji': 0,
-            'net_flux': 4})
-        self.assertDictEqual(k_model.mechanism_G.G.edges[(1, 2)], {
-            'distance_ij': 1 / 6,
-            'distance_ji': -1 / 6,
-            'flux_ij': 4,
-            'flux_ji': 0,
-            'net_flux': 4})
-        self.assertDictEqual(k_model.mechanism_G.G.edges[(2, 3)], {
-            'distance_ij': 1 / 6,
-            'distance_ji': -1 / 6,
-            'flux_ij': 5,
-            'flux_ji': 1,
-            'net_flux': 4})
 
     def test_performance(self):
         print("# TEST Speed")
-        base = Path.home()/"E29Project-2023-04-11/054-NaK2K/02-Charmm_scale_R/06-C_0.75/07-.1ps/"
-        if base.is_dir():
-            print("Run speed test")
-            file_list = [base / f"{i:02}/analysis/08-02-1.8A/k_cylinder.log" for i in range(4)]
-            k_model = kinetics.Sf_model(file_list, print_time=True)
+        base = Path.home()/"E29Project-2023-04-11/076-MthK/20-C-POT-iso_radius/22-0.78/07_+150_0.2ps/"
+        f_list = [base/f"{i:02d}/analysis/08-02-1.8A/k_cylinder.log"  for i in range(2)]
 
+        if f_list[0].is_file() and f_list[1].is_file():
+            print("Run speed test")
+            # clear cache file
+            cache_list = [base / f"{i:02d}/analysis/08-02-1.8A/k_cylinder.jump_np_array.npy" for i in range(2)]
+            # for f in cache_list:
+            #     if f.is_file():
+            #         f.unlink()
+            t0 = time.time()
+            k_model = kinetics.Sf_model(f_list, print_time=True)
+            t1 = time.time()
+            print(f"{t1 - t0:.2f} s")
+
+            # redo, cache will be used. It can be 40 times faster
+            k_model = kinetics.Sf_model(f_list, print_time=True)
+            t2 = time.time()
+            print(f"{t2 - t1:.2f} s")
         else:
-            print("Data not found, skip speed test")
+            print("Speed test cannot be done. Input files are not found.")
 
     def test_rate_cycle_correct(self):
         print("# TEST rate_cycle_correct")
