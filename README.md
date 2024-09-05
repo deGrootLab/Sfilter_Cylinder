@@ -86,7 +86,7 @@ cat NaK2K_C.json
 
 ## 3.What can it do?
 ### 3.1. Count ion permeation  
-![permeation](ion-counting.jpg "permeation definition")
+![permeation](Fig/ion-counting.jpg "permeation definition")
 Ion permeation is defined by sequentially passing though 4,1,3 compartment.  
 We provide a command line tool to run this counting. `count_cylinder.py`    
 
@@ -105,3 +105,5 @@ We provide a command line tool to run this counting. `count_cylinder.py`
 
 ### 3.6. MSM mechanism analysis
 Mechanism analysis, Under development.  
+![Mech_Graph](Fig/MthK+-150_03.png "Mechanism Graph")  
+(a)(b) The mechanism graph was built on the trajectory of MthK Charmm36m with 0.78 scaling under -150 mV or +150 mV. 515 or 970 permeation events were observed in 500 ns x 10 replica simulations. The normal numbers on the edges are the net flux. The thickness of the edge (arrow) corresponds to the rate, and the rate is defined as the inverse of the mean first passage time.  The node's size corresponds to the overall population of all the nodes' states. Nodes with 4 K+ ions in SF are in orange and nodes with 3 K+ ions in SF are in blue. In panel (a), states A and B are lumped together when rate_AB * rate_BA exceeds 125.0 ns-1, similarly, in panel (b), they are lumped when this product exceeds 180.0 ns-1.
