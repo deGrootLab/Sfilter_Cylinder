@@ -6,6 +6,7 @@ from Sfilter.util.output_wrapper import read_k_cylinder
 from Sfilter.util.output_wrapper import read_k_cylinder_list
 import time
 from pathlib import Path
+import numpy as np
 
 class MyTestCase(unittest.TestCase):
     def test_line_to_state(self):
@@ -96,12 +97,26 @@ class MyTestCase(unittest.TestCase):
         l = "# S6l 1 SOD Wat , , SOD , SOD , SOD , Wat ,"
         self.assertEqual(Sfilter.util.output_wrapper._s6l_function2_nonK(l, ion="SOD"), "K0KKKW")
 
+    def test_s6l_Co_occu(self):
+        K1 = np.array([1,1,1,0,0,0])
+        W1 = np.array([1,0,1,0,1,0])
+        code = Sfilter.util.output_wrapper.s6l_Co_occu(K1, W1)
+        self.assertSequenceEqual(code, "CKC0W0")
+
     def test_read_k_cylinder(self):
         print("# TESTING read_k_cylinder, see if we can read the correct 6 letter code and meta data")
-        for get_occu in [True, False]:
-            s_list, meta_data, K_occupency, W_occupency = read_k_cylinder("04-output_wrapper/C_0.75_2ps/05-2ps/00"
+        for get_occu, get_jump in ((False, False),
+                                   (True, False),
+                                   (True, True),
+                                   ):
+            if get_jump:
+                s_list, meta_data, K_occ, W_occ, jump = read_k_cylinder("04-output_wrapper/C_0.75_2ps/05-2ps/00"
                                                                           "/analysis/04-state-code/k_cylinder.log",
-                                                                          get_occu=get_occu)
+                                                                          get_occu=get_occu, get_jump=get_jump)
+            else:
+                s_list, meta_data, K_occ, W_occ = read_k_cylinder("04-output_wrapper/C_0.75_2ps/05-2ps/00"
+                                                                              "/analysis/04-state-code/k_cylinder.log",
+                                                                              get_occu=get_occu)
             self.assertListEqual(s_list[:3], ["WK0KKW", "WK0KKW", "WK0KKW"])
             # meta_data
             self.assertDictEqual(
@@ -120,6 +135,25 @@ class MyTestCase(unittest.TestCase):
                                6100, 6101, 6102, 6103, 6104, 6105, 6106, 6107, 6108, 6109, 6110, 6111, 6112, 6113,
                                6114, 6115, 6116, 6117, 6118, 6119]
                  })
+            if get_occu:
+                self.assertEqual(len(K_occ), 501)
+                self.assertListEqual(K_occ[:3].tolist(),
+                                     [
+                                         [0, 1, 0, 1, 1, 0],
+                                         [0, 1, 0, 1, 1, 0],
+                                         [0, 1, 0, 1, 1, 0]
+                                     ])
+                self.assertEqual(len(W_occ), 501)
+                self.assertListEqual(W_occ[:3].tolist(),
+                                     [
+                                         [2, 0, 0, 0, 0, 15],
+                                         [2, 0, 0, 0, 0, 14],
+                                         [2, 0, 0, 0, 0, 12]
+                                     ])
+            if get_jump:
+                self.assertListEqual(jump.tolist()[:7], [0, 0, 0, 1, 0, 0, -1])
+                self.assertListEqual(jump.tolist()[70:74], [0, -1, 1, 1])
+
 
     def test_read_k_cylinder_SOD(self):
         print("# TESTING read_k_cylinder, SOD")
@@ -133,9 +167,19 @@ class MyTestCase(unittest.TestCase):
         self.assertListEqual(s_list1[:5], ["WKKK0K", "K0KKKW", "K0KKKW", "K0KKKW", "K0KKKW"])
 
     def test_read_state_file_co_occupy(self):
-        print("# TESTING read_k_cylinder, Co-occupy. 6 letter code contains K, W, and C")
-        for get_occu in [True, False]:
-            s_list, meta_data, K_occupency, W_occupency = read_k_cylinder("04-output_wrapper/C_0.75_2ps/05-2ps/00"
+        print("# TESTING read_k_cylinder, Co-occupy. 6 letter code contains K, W, C, and 0")
+        for s, get_occu, get_jump in (("get_occu=F, get_jump=F", False, False),
+                                      ("get_occu=T, get_jump=F", True , False),
+                                      ("get_occu=T, get_jump=T", True ,  True),
+                                      ):
+            print(s)
+            if get_jump:
+                s_list, meta_data, K_occ, W_occ, jump = read_k_cylinder("04-output_wrapper/C_0.75_2ps/05-2ps/00"
+                                                                            "/analysis/04-state-code/k_cylinder.log",
+                                                                            method="Co-occupy",
+                                                                            get_occu=get_occu, get_jump=get_jump)
+            else:
+                s_list, meta_data, K_occ, W_occ = read_k_cylinder("04-output_wrapper/C_0.75_2ps/05-2ps/00"
                                                                           "/analysis/04-state-code/k_cylinder.log",
                                                                           method="Co-occupy",
                                                                           get_occu=get_occu)
@@ -157,6 +201,76 @@ class MyTestCase(unittest.TestCase):
                                6100, 6101, 6102, 6103, 6104, 6105, 6106, 6107, 6108, 6109, 6110, 6111, 6112, 6113,
                                6114, 6115, 6116, 6117, 6118, 6119]
                  })
+            if get_occu:
+                self.assertEqual(len(K_occ), 501)
+                self.assertListEqual(K_occ[:3].tolist(),
+                                     [
+                                         [0, 1, 0, 1, 1, 0],
+                                         [0, 1, 0, 1, 1, 0],
+                                         [0, 1, 0, 1, 1, 0]
+                                     ])
+                self.assertEqual(len(W_occ), 501)
+                self.assertListEqual(W_occ[:3].tolist(),
+                                     [
+                                         [2, 0, 0, 0, 0, 15],
+                                         [2, 0, 0, 0, 0, 14],
+                                         [2, 0, 0, 0, 0, 12]
+                                     ])
+            if get_jump:
+                self.assertListEqual(jump.tolist()[:7], [0, 0, 0, 1, 0, 0, -1])
+                self.assertListEqual(jump.tolist()[70:74], [0, -1, 1, 1])
+
+    def test_read_k_cylinder_K_priority_S14(self):
+        print("# TESTING read_k_cylinder, K_priority_S14. 4 letter code contains K, W, and 0")
+        for s, get_occu, get_jump in (("get_occu=F, get_jump=F", False, False),
+                                      ("get_occu=T, get_jump=F", True , False),
+                                      ("get_occu=T, get_jump=T", True ,  True),
+                                      ):
+            print(s)
+            if get_jump:
+                s_list, meta_data, K_occ, W_occ, jump = read_k_cylinder(
+                    "04-output_wrapper/C_0.75_2ps/05-2ps/00/analysis/04-state-code/k_cylinder.log",
+                    method="K_priority_S14", get_occu=get_occu, get_jump=get_jump)
+            else:
+                s_list, meta_data, K_occ, W_occ = read_k_cylinder(
+                    "04-output_wrapper/C_0.75_2ps/05-2ps/00/analysis/04-state-code/k_cylinder.log",
+                    method="K_priority_S14", get_occu=get_occu)
+            self.assertListEqual(s_list[:3], ["K0KK", "K0KK", "K0KK"])
+            self.assertListEqual(s_list[405:408], ["K0KK", "K0KK", "KK0K"])
+            self.assertDictEqual(
+                meta_data,
+                {'ion_name': 'POT', 'num_ion': 160, 'time_step': 2.0,
+                 "ion_index": [5960, 5961, 5962, 5963, 5964, 5965, 5966, 5967, 5968, 5969, 5970, 5971, 5972, 5973,
+                               5974, 5975, 5976, 5977, 5978, 5979, 5980, 5981, 5982, 5983, 5984, 5985, 5986, 5987,
+                               5988, 5989, 5990, 5991, 5992, 5993, 5994, 5995, 5996, 5997, 5998, 5999, 6000, 6001,
+                               6002, 6003, 6004, 6005, 6006, 6007, 6008, 6009, 6010, 6011, 6012, 6013, 6014, 6015,
+                               6016, 6017, 6018, 6019, 6020, 6021, 6022, 6023, 6024, 6025, 6026, 6027, 6028, 6029,
+                               6030, 6031, 6032, 6033, 6034, 6035, 6036, 6037, 6038, 6039, 6040, 6041, 6042, 6043,
+                               6044, 6045, 6046, 6047, 6048, 6049, 6050, 6051, 6052, 6053, 6054, 6055, 6056, 6057,
+                               6058, 6059, 6060, 6061, 6062, 6063, 6064, 6065, 6066, 6067, 6068, 6069, 6070, 6071,
+                               6072, 6073, 6074, 6075, 6076, 6077, 6078, 6079, 6080, 6081, 6082, 6083, 6084, 6085,
+                               6086, 6087, 6088, 6089, 6090, 6091, 6092, 6093, 6094, 6095, 6096, 6097, 6098, 6099,
+                               6100, 6101, 6102, 6103, 6104, 6105, 6106, 6107, 6108, 6109, 6110, 6111, 6112, 6113,
+                               6114, 6115, 6116, 6117, 6118, 6119]})
+            if get_occu:
+                self.assertEqual(len(K_occ), 501)
+                self.assertListEqual(K_occ[:3].tolist(),
+                                     [
+                                         [1, 0, 1, 1],
+                                         [1, 0, 1, 1],
+                                         [1, 0, 1, 1]
+                                     ])
+                self.assertEqual(len(W_occ), 501)
+                self.assertListEqual(W_occ[:3].tolist(),
+                                     [
+                                         [0, 0, 0, 0],
+                                         [0, 0, 0, 0],
+                                         [0, 0, 0, 0]
+                                     ])
+            if get_jump:
+                self.assertListEqual(jump.tolist()[:7], [0, 0, 0, 1, 0, 0, -1])
+                self.assertListEqual(jump.tolist()[70:74], [0, -1, 1, 1])
+
 
     def test_read_k_cylinder_list(self):
         print("# TESTING read_k_cylinder_list, read a sequence of k_cylinder.log files")
@@ -214,9 +328,16 @@ class MyTestCase(unittest.TestCase):
     def test_read_k_cylinder_broken_line(self):
         print("# TESTING read_k_cylinder, broken line")
         for i in range(6):
-            s_list, meta_data, K_occupency, W_occupency = read_k_cylinder(f"01-NaK2K/1-Charmm/broken_last_frame/k_cylinder_{i}.out")
+            s_list, meta_data, K_occ, W_occ = read_k_cylinder(f"01-NaK2K/1-Charmm/broken_last_frame/k_cylinder_{i}.out")
             self.assertListEqual(s_list, ["WKKKKW", "KK0KKW", "KK0KKW", "WKKKKW", "WKKKKW",
                                       "WKKKKW", "KK0KKW", "WKK0KW", "0K0KKW", "WK0KKW"])
+        for i in range(6):
+            s_list, meta_data, K_occ, W_occ = read_k_cylinder(
+                f"01-NaK2K/1-Charmm/broken_last_frame/k_cylinder_{i}.out",
+                method="Co-occupy"
+            )
+            self.assertListEqual(s_list, ["WKKKKW", "KK0KKW", "KK0KKW", "WKKKKW", "WKKKKW",
+                                          "WKKKKW", "CK0KKW", "WKK0KW", "0K0KKW", "WK0KKW"])
 
 
     def test_read_k_cylinder_speed(self):

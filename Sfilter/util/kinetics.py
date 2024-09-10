@@ -171,7 +171,7 @@ class Sf_model:
             for file in self.file_list:
                 print(file)
                 # if the cached jump file exists, use it. otherwise used get_jump. It should be in the same folder as the file.
-                if file.with_suffix(".jump_np_array.npy").exists():
+                if file.with_suffix(".jump_np_array.npy").exists() and (method=="K_priority" or method=="Co-occupy"):
                     traj, meta_data, K_occ, W_occ = read_k_cylinder(file, method, get_occu=False)
                     jump_array = np.load(file.with_suffix(".jump_np_array.npy"))
                     if len(jump_array) != len(traj):
@@ -180,7 +180,8 @@ class Sf_model:
                 else :
                     traj, meta_data, K_occ, W_occ, jump_array = read_k_cylinder(file, method, get_occu=True, get_jump=True)
                     self.jump_array_alltraj.append(jump_array)
-                    np.save(file.with_suffix(".jump_np_array.npy"), jump_array)
+                    if (method=="K_priority" or method=="Co-occupy"):
+                        np.save(file.with_suffix(".jump_np_array.npy"), jump_array)
                 time_step_list.append(meta_data["time_step"])
                 unique_state = sorted(set(traj))
                 for s in unique_state:
