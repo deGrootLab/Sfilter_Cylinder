@@ -45,6 +45,22 @@ class MyTestCase(unittest.TestCase):
         self.assertListEqual(res_dict[   1][       1][  0][0:2], [0, 6]) # start
         self.assertListEqual(res_dict[   1][       2][  0][0:2], [3, 7]) # end
 
+    def test_no_passage_warning(self):
+        print("#TESTING: In case there is no passage from state i to j.")
+        base = Path("04-output_wrapper/C_0.75_2ps/05-2ps")
+        file_list = [base / f"{i:02}/analysis/04-state-code/k_cylinder.log" for i in range(2)]
+        k_model = kinetics.Sf_model(file_list)
+
+        with self.assertWarns(UserWarning) as cm:
+            k_model.get_passage_AB_shortest(15, 14)
+        # Optionally, you can check the warning message
+        self.assertEqual(str(cm.warning), "No passage from 15 to 14.")
+
+        with self.assertWarns(UserWarning) as cm:
+            k_model.get_mfpt_AB_shortest_passage(15, 14)
+        # Optionally, you can check the warning message
+        self.assertEqual(str(cm.warning), "No passage from 15 to 14.")
+
 
 
 

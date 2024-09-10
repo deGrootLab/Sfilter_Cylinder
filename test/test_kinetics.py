@@ -433,11 +433,13 @@ class MyTestCase(unittest.TestCase):
                          ("WKK0KW", "KK0KKW")):
             res_dict = k_model.get_passage_AB(s_i, s_j)
             self.assertDictEqual(res_dict, answer_dict)
-            res_short = k_model.get_passage_AB_shortest(s_i, s_j)
+            res_short, jump = k_model.get_passage_AB_shortest(s_i, s_j)
             self.assertEqual(res_short, answer_dict[-2])
-            mfpt, mfpt_alltraj = k_model.get_mfpt_AB_shortest_passage(s_i, s_j)
+            self.assertEqual(jump, -2)
+            mfpt, mfpt_alltraj, jump = k_model.get_mfpt_AB_shortest_passage(s_i, s_j)
             self.assertAlmostEqual(mfpt, 119.0)
             self.assertListEqual(mfpt_alltraj, [223.0, 15.0])
+            self.assertEqual(jump, -2)
 
 
 

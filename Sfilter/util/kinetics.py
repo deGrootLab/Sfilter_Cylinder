@@ -405,8 +405,13 @@ class Sf_model:
         if isinstance(state_B, str):
             state_B = self.get_state_index(state_B)
         passage_all = self.passage_cycle_correct.get_passage_ij(state_A, state_B)
-        min_pass_jump = min(list(passage_all.keys()), key=abs)
-        return passage_all[min_pass_jump]
+        if passage_all == {}:
+            warnings.warn(f"No passage from {state_A} to {state_B}.")
+            rep_n = len(self.traj_raw_alltraj)
+            return ([[]]*rep_n, [[]]*rep_n, [[]]*rep_n), None
+        else :
+            min_pass_jump = min(list(passage_all.keys()), key=abs)
+            return passage_all[min_pass_jump], min_pass_jump
 
 
     def get_mfpt_AB_shortest_passage(self, state_A, state_B):
@@ -420,10 +425,12 @@ class Sf_model:
             mfpt : float, the mean first passage time from state_A to state_B (average over all replicas).
             mfpt_alltraj : a list of float, the mean first passage time from state_A to state_B in each replica.
         """
-        (length, start, end) = self.get_passage_AB_shortest(state_A, state_B)
+        (length, start, end), jump = self.get_passage_AB_shortest(state_A, state_B)
+        if jump is None:
+            return np.inf, [np.inf]*len(self.traj_raw_alltraj), None
         mfpt = np.concatenate(length).mean() * self.time_step
         mfpt_alltraj =[np.mean(l)* self.time_step for l in length]
-        return mfpt, mfpt_alltraj
+        return mfpt, mfpt_alltraj, jump
 
 
     def set_lumping_from_str(self, lumping_list, dtype=np.int16, calc_passage_time=False, letter=6):
@@ -678,6 +685,7 @@ class Sf_model:
     def get_mfpt(self, traj_type="lumped"):
         """
         Compute and return the mfpt from self.passage_time_length_alltraj
+        This result has not been cycle corrected.
         :param traj_type: "lumped" or "raw"
         :return: mfpt, a np.array of size (n, n), mfpt from every node to every node.
                  mfpt_every_traj, mfpt for individual traj.
@@ -726,6 +734,7 @@ class Sf_model:
     def get_rate_inverse_mfpt(self, traj_type="lumped"):
         """
         Compute and return the rate. This rate_ij is defined as : 1 / mfpt_ij
+        This result has not been cycle corrected.
         :param traj_type: "lumped" or "raw"
         :return: rate, a np.array of size (n, n), rate from every node to every node.
                  rate_every_traj, a list of rate for individual traj.
@@ -749,6 +758,7 @@ class Sf_model:
     def get_rate_passage_time(self, traj_type="lumped"):
         """
         Compute and return the rate. This rate_ij is defined as : number of passage / (total frame of i * time_step)
+        This result has not been cycle corrected.
         :param traj_type: "lumped" or "raw"
         :return: rate, a np.array of size (n, n), rate from every node to every node.
                  rate_every_traj, a list of rate for individual traj.
@@ -828,167 +838,121 @@ def k_distance(A, B):
 
 class Mechanism_Graph:
     """
+    This is the class for plotting the mechanism graph. Especially for the lumped graph.
 
     """
 
     def __init__(self, model):
         """
-        :param net_flux:
-        :param flux:
-        :param net_flux_raw:
-        :param flux_raw:
-        :param state_distribution:
-        :param node_map_int_2_s:
-        :param node_map_s_2_int:
-        :param state_map_int_2_s:
-        :param state_map_s_2_int:
-        :param letter: int, the number of binding sites to use.
-            4: S1 - S4
-            5: S0 - S4
-            6: S0 - S5
+        :param model : Sf_model
         """
         if isinstance(model, Sf_model):
             self.model = model
         else:
             raise ValueError("model should be an instance of Sf_model.")
 
-        # build a DiGraph
-        self.G = nx.DiGraph()
-        self.G.add_nodes_from(range(len(self.model.node_map_int_2_s)))
-        for i in range(len(self.model.node_map_int_2_s)):
-            for j in range(len(self.model.node_map_int_2_s)):
-                if flux[i, j] > 0 and i != j and net_flux[i, j] >= 0:
-
-                    # pick i,j that has the maximum flux
-                    max_net_flux = 0
-                    for si in node_map_int_2_s[i]:
-                        for sj in node_map_int_2_s[j]:
-                            if flux_raw[state_map_s_2_int[si], state_map_s_2_int[sj]] > max_net_flux:
-                                max_net_flux = net_flux_raw[state_map_s_2_int[si], state_map_s_2_int[sj]]
-                                max_si = si
-                                max_sj = sj
-                    if letter == 4:
-                        distance_ij, distance_ji = k_distance(max_si[1:5], max_sj[1:5])
-                    elif letter == 5:
-                        distance_ij, distance_ji = k_distance(max_si[0:5], max_sj[0:5])
-                    elif letter == 6:
-                        distance_ij, distance_ji = k_distance(max_si[0:6], max_sj[0:6])
-                    else:
-                        raise ValueError("letter should be 4(S1~S4), 5(S0~S4) or 6(S0~S5).")
-                    self.G.add_edge(i, j, net_flux=net_flux[i, j], flux_ij=flux[i, j], flux_ji=flux[j, i],
-                                    distance_ij=distance_ij, distance_ji=distance_ji)
-
-    def set_graph_rate(self, rate):
-        self.rate = rate
-        for i in range(len(self.node_map_int_2_s)):
-            for j in range(len(self.node_map_int_2_s)):
-                if self.G.has_edge(i, j):
-                    self.G.edges[i, j]["rate_ij"] = rate[i, j]
-                    self.G.edges[i, j]["rate_ji"] = rate[j, i]
-
-
-    def get_graph_rate_df_node_ij(self, node_i, node_j):
+    def build_graph(self, flux_cutoff=2):
         """
-        for a given edge (node_i -> node_j), use the rate with the maximum flux.
-        :param df:
-        :param node_map_int_2_s:
-        :param node_i:
-        :param node_j:
-        :return: state_i, state_j, rate_ij, rate_ji
-        """
-        df = self.raw_traj_df
-        node_map_int_2_s = self.node_map_int_2_s
-        # loop over all states
-        max_flux_ij = 0
-        rate_ij = 0
-        rate_ji = 0
-        str_i = ""
-        str_j = ""
-        for s_i in node_map_int_2_s[node_i]:
-            for s_j in node_map_int_2_s[node_j]:
-                # find the row in df, it can either be A->B or B->A
-                row_AB = df[(df["A"] == s_i) & (df["B"] == s_j)]
-                row_BA = df[(df["A"] == s_j) & (df["B"] == s_i)]
-
-                if len(row_AB) == 0 and len(row_BA) == 0:
-                    continue
-                elif len(row_AB) == 0 and len(row_BA) == 1:
-                    if row_BA["flux_BA"].values[0] > max_flux_ij:
-                        max_flux_ij = row_BA["flux_BA"].values[0]
-                        rate_ij = row_BA["rate_ABcc_inv_mfpt"].values[0]
-                        rate_ji = row_BA["rate_BAcc_inv_mfpt"].values[0]
-                        str_i = s_i
-                        str_j = s_j
-                elif len(row_AB) == 1 and len(row_BA) == 0:
-                    if row_AB["flux_AB"].values[0] > max_flux_ij:
-                        max_flux_ij = row_AB["flux_AB"].values[0]
-                        rate_ij = row_AB["rate_ABcc_inv_mfpt"].values[0]
-                        rate_ji = row_AB["rate_BAcc_inv_mfpt"].values[0]
-                        str_i = s_i
-                        str_j = s_j
-                else:
-                    raise ValueError("There should be only one row in df.")
-        return str_i, str_j, rate_ij, rate_ji
-
-
-
-
-    def set_graph_rate_df(self):
-        """
-        for each edge, use the rate with the maximum flux.
-        :param df:
+        Build the graph (Directed).
+        Each edge has the following attributes:
+            flux_ij : the flux from node i to node j.
+            flux_ji : the flux from node j to node i.
+            mfpt_ij : the mean first passage time of the states pair that contributes the most to the flux_ij. (ps)
+            mfpt_ji : the mean first passage time of the states pair that contributes the most to the flux_ji. (ps)
+            Only the shortest passage is considered.
+        If you change the lumping, you should call this function again.
         :return:
         """
-        df = self.raw_traj_df
-        node_map_int_2_s = self.node_map_int_2_s
-        # loop over edges
-        for node_i, node_j, data in self.G.edges(data=True):
-            str_i, str_j, rate_ij, rate_ji = self.get_graph_rate_df_node_ij(node_i, node_j)
-            self.G.edges[node_i, node_j]["rate_ij"] = rate_ij
-            self.G.edges[node_i, node_j]["rate_ji"] = rate_ji
+        self.G = nx.DiGraph()
+        for node_i in self.model.node_map_int_2_s:
+            self.G.add_node(node_i)
+        for i_node in self.model.node_map_int_2_s:
+            for j_node in self.model.node_map_int_2_s:
+                if i_node != j_node:
+                    flux_ij = self.model.flux_matrix[i_node, j_node]
+                    flux_ji = self.model.flux_matrix[j_node, i_node]
+                    mfpt_ij = np.inf
+                    mfpt_ji = np.inf
+                    df = self.get_edge_info_df(i_node, j_node, flux_cutoff)
+                    n_rep = len(self.model.traj_raw_alltraj)
+                    f_ij_alltraj = np.array([self.model.flux_matrix_raw_alltraj[rep][i_node, j_node] for rep in range(n_rep)])
+                    f_ji_alltraj = np.array([self.model.flux_matrix_raw_alltraj[rep][j_node, i_node] for rep in range(n_rep)])
+                    if np.all(f_ij_alltraj > flux_cutoff):
+                        df = df.sort_values(by="flux_ij", ascending=False)
+                        mfpt_ij = df.iloc[0]["mfpt_ij"]
+                    if np.all(f_ji_alltraj > flux_cutoff):
+                        df = df.sort_values(by="flux_ji", ascending=False)
+                        mfpt_ji = df.iloc[0]["mfpt_ji"]
+                    self.G.add_edge(i_node, j_node, flux_ij=flux_ij, flux_ji=flux_ji, mfpt_ij=mfpt_ij, mfpt_ji=mfpt_ji)
 
-
-
-
-    def get_node_proportion(self, node):
+    def get_edge_info_df(self, node_i, node_j, flux_cutoff=2):
         """
-        Get the proportion of each state in a node.
-        :param node: int, the node.
-        :return: sum proportion of every state.
+        Get all the edge info in a pd.DataFrame.
+        :param node_i : int
+        :param node_j : int
+        :param flux_cutoff : int, only when the flux in every replica is larger than flux_cutoff, the mfpt will be calculated.
+        only when there is flux between states, the mfpt will be calculated.
+        | i_state | j_state | i_name | j_name | flux_ij | flux_ji | mfpt_ij | mfpt_ji |
+        :return: df, pd.DataFrame
         """
-        return np.sum([self.state_distribution[s] for s in self.node_map_int_2_s[node]])
+        node_i_states = [self.model.state_map_s_2_int[s]  for s in self.model.node_map_int_2_s[node_i]]
+        node_j_states = [self.model.state_map_s_2_int[s]  for s in self.model.node_map_int_2_s[node_j]]
+        i_state_list = []
+        j_state_list = []
+        i_name_list = []
+        j_name_list = []
+        flux_ij_list = []
+        flux_ji_list = []
+        mfpt_ij_list = []
+        mfpt_ji_list = []
+        n_rep = len(self.model.traj_raw_alltraj)
+        for i_s in node_i_states:
+            for j_s in node_j_states:
+                flux_ij = self.model.flux_matrix_raw[i_s, j_s]
+                flux_ji = self.model.flux_matrix_raw[j_s, i_s]
+                mfpt_ij = np.inf
+                mfpt_ji = np.inf
+                f_ij_alltraj = np.array(
+                    [self.model.flux_matrix_raw_alltraj[rep][i_s, j_s] for rep in range(n_rep)])
+                f_ji_alltraj = np.array(
+                    [self.model.flux_matrix_raw_alltraj[rep][j_s, i_s] for rep in range(n_rep)])
+                if np.all(f_ij_alltraj > flux_cutoff):
+                    mfpt_ij, mfpt_alltraj, jump = self.model.get_mfpt_AB_shortest_passage(i_s, j_s)
+                if np.all(f_ji_alltraj > flux_cutoff):
+                    mfpt_ji, mfpt_alltraj, jump = self.model.get_mfpt_AB_shortest_passage(j_s, i_s)
+                i_state_list.append(i_s)
+                j_state_list.append(j_s)
+                i_name_list.append(self.model.state_map_int_2_s[i_s])
+                j_name_list.append(self.model.state_map_int_2_s[j_s])
+                flux_ij_list.append(flux_ij)
+                flux_ji_list.append(flux_ji)
+                mfpt_ij_list.append(mfpt_ij)
+                mfpt_ji_list.append(mfpt_ji)
+        df = pd.DataFrame({"i_state": i_state_list,
+                           "j_state": j_state_list,
+                           "i_name": i_name_list,
+                           "j_name": j_name_list,
+                           "flux_ij": flux_ij_list,
+                           "flux_ji": flux_ji_list,
+                           "mfpt_ij": mfpt_ij_list,
+                           "mfpt_ji": mfpt_ji_list})
+        return df
 
 
-
-    def test_lump(self, node_a, node_b):
+    def get_node_info_df(self, node_ind):
         """
-        if we lump 2 nodes, will it affect the permeation?
-        :return: cycle_list, a list of cycle. The permeation in those cycle will lost.
+        Get all the node info in a pd.DataFrame.
+        | state | proportion |
+        :return: df, pd.DataFrame
         """
-        # make sure there is an edge from node_a to node_b
-        if self.G.has_edge(node_b, node_a):
-            node_a, node_b = node_b, node_a
-        elif node_a == node_b:
-            return []
-        elif not self.G.has_edge(node_a, node_b):
-            return []
+        state_list = []
+        proportion_list = []
+        for state in self.model.node_map_int_2_s[node_ind]:
+            state_list.append(state)
+            proportion_list.append(self.model.state_distribution[state])
+        df = pd.DataFrame({"state": state_list, "proportion": proportion_list})
+        return df
 
-        # Is there a 3-node-cycle including node_a and node_b?
-        cycle_list = []
-        for node_c in self.G.nodes():
-            if self.G.has_edge(node_b, node_c) and self.G.has_edge(node_c, node_a):
-                # check if all the distance_ij are positive
-                dist_ab = self.G.edges[node_a, node_b]["distance_ij"]
-                dist_bc = self.G.edges[node_b, node_c]["distance_ij"]
-                dist_ca = self.G.edges[node_c, node_a]["distance_ij"]
-                if dist_ab > 0 and dist_bc > 0 and dist_ca > 0:
-                    min_net_flux = min(self.G[node_a][node_b]["net_flux"],
-                                       self.G[node_b][node_c]["net_flux"],
-                                       self.G[node_c][node_a]["net_flux"])
-                    if min_net_flux > 0:
-                        cycle_list.append(((node_a, node_b, node_c), (dist_ab, dist_bc, dist_ca), min_net_flux))
-        cycle_list.sort(key=lambda x: x[-1], reverse=True)
-        return cycle_list
 
     def guess_init_position(self, str_2_xy=None):
         """
@@ -1011,7 +975,7 @@ class Mechanism_Graph:
                 return x, center_mass
         position = {}
         for i in self.G.nodes:
-            p_i = [str_2_xy(si) for si in self.node_map_int_2_s[i]]
+            p_i = [str_2_xy(si) for si in self.model.node_map_int_2_s[i]]
             p_i = np.mean(p_i, axis=0)
             position[i] = p_i
         return position
@@ -1027,7 +991,7 @@ class Mechanism_Graph:
         """
         if label_function is None:
             def label_function(i, add_index=True):
-                node = self.node_map_int_2_s[i]
+                node = self.model.node_map_int_2_s[i]
                 if not add_index:
                     string = ""
                 elif len(node) <= 1:
@@ -1044,7 +1008,7 @@ class Mechanism_Graph:
         nx.set_node_attributes(self.G, label_dict, "label")
 
     def draw_dirty(self, ax, node_list=None, node_size_range=((0.01, 0.3), (30, 900)), edge_width=None,
-                   net_flux_cutoff=10,
+                   net_flux_cutoff=10, net_flux_node_cutoff=15,
                    node_alpha=0.7, edge_alpha=0.5, add_index=True,
                    spring_iterations=5, spring_k=10, pos=None,
                    label_bbox=None):
@@ -1057,7 +1021,7 @@ class Mechanism_Graph:
         if node_list is None:
             node_list = []
             for i in self.G.nodes:
-                if np.any(self.net_flux[i, :] > net_flux_cutoff) or np.any(self.net_flux[:, i] > net_flux_cutoff):
+                if np.any(self.model.net_flux_matrix[i, :] > net_flux_node_cutoff) or np.any(self.model.net_flux_matrix[:, i] > net_flux_node_cutoff):
                     node_list.append(i)
         sub_G = self.G.subgraph(node_list)
         # 2 spring_layout
@@ -1069,7 +1033,7 @@ class Mechanism_Graph:
         # 3 node size based on distribution
         self.set_node_label(add_index=add_index)
         ((min_p, max_p), (min_size, max_size)) = node_size_range
-        size_dict = {i: min_size + (max_size - min_size) * (self.node_distribution[i] - min_p) / (max_p - min_p) for i
+        size_dict = {i: min_size + (max_size - min_size) * (self.model.node_distribution[i] - min_p) / (max_p - min_p) for i
                      in self.G.nodes}
         # color
         color_dict = {1: [1  , 0.1, 0.1, 1],
@@ -1080,7 +1044,10 @@ class Mechanism_Graph:
                       }
         color_list = []
         for node in sub_G:
-            K_number = self.node_map_int_2_s[node][0][:5].count("K") + self.node_map_int_2_s[node][0][:5].count("C")
+            s_list = [(s, self.model.state_Counter[s]) for s in self.model.node_map_int_2_s[node]]
+            s_list = sorted(s_list, key=lambda x: x[1], reverse=True)
+            K_number = s_list[0][0].count("K") + s_list[0][0].count("C")
+            # K_number = self.model.node_map_int_2_s[node][0][:5].count("K") + self.model.node_map_int_2_s[node][0][:5].count("C")
             # K_number = (K_number + 8) % 10
             color_list.append(color_dict[K_number])
         nx.draw_networkx_nodes(sub_G, ax=ax, pos=pos,
@@ -1092,23 +1059,21 @@ class Mechanism_Graph:
         edge_list = []
         edge_label = {}
         edge_rate = []
-        if self.rate is None:
-            for u, v, d in sub_G.edges(data=True):
-                if d["net_flux"] > net_flux_cutoff:
-                    edge_list.append((u, v))
-                    edge_label[(u, v)] = f"{d['net_flux']:d}"
-                    edge_rate.append(d["net_flux"])
-        else:
-            for u, v, d in sub_G.edges(data=True):
-                if d["net_flux"] > net_flux_cutoff:
-                    edge_list.append((u, v))
-                    edge_label[(u, v)] = f"{d['net_flux']:d}"
-                    edge_rate.append(d["rate_ij"])
-        # rescale edge_width
+
+        for u, v, d in sub_G.edges(data=True):
+            if d["flux_ij"] - d["flux_ji"] > net_flux_cutoff:
+                edge_list.append((u, v))
+                edge_label[(u, v)] = f'{d["flux_ij"] - d["flux_ji"]:d}'
+                edge_rate.append(1000/d["mfpt_ij"]) # 1/ns
+        # rescale edge_width to k * rate ^ a
         if edge_width is None:
-            edge_width = ((min(edge_rate), max(edge_rate)), (0.05, 10))
-        ((min_rate, max_rate), (min_width, max_width)) = edge_width
-        width_list = [min_width + (max_width - min_width) * (rate - min_rate) / (max_rate - min_rate) for rate in
+            # make the min visible (width=0.1)
+            e_width_a = 0.5
+            edge_rate_ = [rate for rate in edge_rate if rate > 0]
+            e_width_k = 0.1/(min(edge_rate_) ** e_width_a)
+            edge_width = (e_width_k, e_width_a)
+        (e_width_k, e_width_a) = edge_width
+        width_list = [e_width_k*rate**e_width_a for rate in
                       edge_rate]
         nx.draw_networkx_edges(sub_G, ax=ax, pos=pos, edgelist=edge_list, width=width_list, alpha=edge_alpha,
                                connectionstyle='arc3,rad=0.05',
@@ -1127,6 +1092,3 @@ class Mechanism_Graph:
         ax.set_xticks(np.arange(round(xmin, 1), round(xmax, 1), 0.1))
         ax.set_yticks(np.arange(round(ymin, 1), round(ymax, 1), 0.1))
         ax.grid()
-
-
-

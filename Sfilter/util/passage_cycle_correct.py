@@ -28,6 +28,7 @@ class Passage_cycle_correct:
         self.passage_time_length_alltraj_raw = passage_time_length_alltraj_raw
         self.passage_time_point_alltraj_raw = passage_time_point_alltraj_raw
         self.jump_array_alltraj = jump_array_alltraj
+        self.jump_cumsum_alltraj = [np.cumsum(jump_array) for jump_array in jump_array_alltraj]
         self.time_step = time_step
         self.passage_ij_dict = {}
         # this dictionary saves the rate_ij result, so that we don't need to calculate the same rate_ij again.
@@ -57,11 +58,14 @@ class Passage_cycle_correct:
             p_length_alltraj = [self.passage_time_length_alltraj_raw[rep][state_i][state_j] for rep in range(rep_n)]
             p_end_alltraj = [self.passage_time_point_alltraj_raw[rep][state_i][state_j] for rep in range(rep_n)]
             p_start_alltraj = [p_end_alltraj[rep] - p_length_alltraj[rep]   for rep in range(rep_n)]
+
             # the jump of a passage is sum(jump_array_alltraj[rep][start:end])
-            p_jump_alltraj = [[] for i in self.jump_array_alltraj]
-            for rep, (jump_array, p_start, p_end) in enumerate(zip(self.jump_array_alltraj, p_start_alltraj, p_end_alltraj)):
-                for start, end in zip(p_start, p_end):
-                    p_jump_alltraj[rep].append(sum(jump_array[start+1:end+1]))
+            p_jump_alltraj = []
+            for rep, (cumsum_array, p_start, p_end) in enumerate(
+                        zip(self.jump_cumsum_alltraj, p_start_alltraj, p_end_alltraj)):
+                p_jump = cumsum_array[p_end] - cumsum_array[p_start]
+                p_jump_alltraj.append(p_jump)
+
             # group the passage by the number of jumps
             p_result_group = {}
             for rep in range(rep_n):
@@ -102,16 +106,6 @@ class Passage_cycle_correct:
 
 
 
-
-
-    def get_mfpt_ij(self, state_i, state_j):
-        """
-
-        :param state_i:
-        :param state_j:
-        :return:
-        """
-        pass
 
 
 
