@@ -4,9 +4,9 @@ This is a tool for basic analysis in Potassium Channel MD simulation.
 ## 1.Installation
 ### 1.1 Prepare conda environment
 ```bash
-conda create -n Name_of_Env python=3.11 \
-  MDAnalysis numpy pandas scipy networkx matplotlib pyemma \
-  -c conda-forge -y
+conda create -n Name_of_Env \
+  python=3.11 MDAnalysis numpy pandas scipy networkx matplotlib pyemma \
+  -c conda-forge -y # or consider using mamba
 conda activate Name_of_Env
 ```
 ### 1.2 Install Sfilter using pip
@@ -77,7 +77,7 @@ this is the time that the atom stays in the cylinder. This time should be safely
 ```bash
 cd $base/05-HRE/01-charmm-charge/distribution/
 analyse_distribution.py -i NaK2K_C_HRE.json
-# analysi the distribution of SF state
+# analyse the distribution of SF state
 
 cd $base/06-multi_rep/01-charmm-charge/distribution
 cat NaK2K_C.json
@@ -87,7 +87,7 @@ cat NaK2K_C.json
 ## 3.What can it do?
 ### 3.1. Count ion permeation  
 ![permeation](Fig/ion-counting.jpg "permeation definition")
-Ion permeation is defined by sequentially passing though 4,1,3 compartment.  
+An ion permeation event is defined by sequentially passing though 4,1,3 compartment.  
 We provide a command line tool to run this counting. `count_cylinder.py`    
 
 ### 3.2. Track binding site occupancy state
@@ -101,7 +101,7 @@ We provide a command line tool to run this counting. `count_cylinder.py`
 `analyse_distribution.py` is provided to do further analysis on the std_out from `count_cylinder.py`. It can compute the proportion of each state and estimate the error using bootstrap.
 
 ### 3.5. MD on toy model
-`Langevin` module provides funtion for running Langevin dynamics. You can provide you own topology. See `tutorial/02-Langevin-dynamic.ipynb`.
+`Langevin` module provides function for running Langevin dynamics. You can provide you own topology. See `tutorial/02-Langevin-dynamic.ipynb`.
 
 ### 3.6. MSM mechanism analysis
 Mechanism analysis, Under development.  
