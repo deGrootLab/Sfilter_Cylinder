@@ -49,6 +49,19 @@ class MyTestCase(unittest.TestCase):
         self.assertListEqual(s34.ix.tolist(), [int(i) - 1 for i in "1555 3292 5591 7328".split()])
         self.assertListEqual(s45.ix.tolist(), [int(i) - 1 for i in "1548 3285 5584 7321".split()])
 
+    def test_detect_SF_sequence_KV10_SerS5(self):
+        print("# TEST detect_SF_sequence KV10.1 Charmm. Ser S5")
+        u = mda.Universe("08-KV10.1/dry.gro")
+        sf = Sfilter.sfilter(u)
+        sf.detect_SF_sequence(["SER", "VAL", "GLY", "PHE", "GLY"], )
+        s00, s01, s12, s23, s34, s45 = sf.sf_oxygen
+        self.assertListEqual(s00.ix.tolist(), [int(i) - 1 for i in "7060 18248 29436 40624".split()])
+        self.assertListEqual(s01.ix.tolist(), [int(i) - 1 for i in "7053 18241 29429 40617".split()])
+        self.assertListEqual(s12.ix.tolist(), [int(i) - 1 for i in "7033 18221 29409 40597".split()])
+        self.assertListEqual(s23.ix.tolist(), [int(i) - 1 for i in "7026 18214 29402 40590".split()])
+        self.assertListEqual(s34.ix.tolist(), [int(i) - 1 for i in "7010 18198 29386 40574".split()])
+        self.assertListEqual(s45.ix.tolist(), [int(i) - 1 for i in "7007 18195 29383 40571".split()])
+
     def test_state_detect(self):
         print("# TEST state_detect")
         u = mda.Universe("01-NaK2K/1-Charmm/em.pdb", "01-NaK2K/1-Charmm/with_water/fix_atom_c_100ps.xtc")

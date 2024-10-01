@@ -33,14 +33,14 @@ def detect_SF(u, SF_seq1, SF_seq2=None):
             S12 += u.residues[i + 2].atoms.select_atoms("name O")
             S23 += u.residues[i + 1].atoms.select_atoms("name O")
             S34 += u.residues[i + 0].atoms.select_atoms("name O")
-            S45 += u.residues[i + 0].atoms.select_atoms("name OG1")
+            S45 += u.residues[i + 0].atoms.select_atoms("name OG*")
         if len(SF_seq2) == 5 and residue_sequence == SF_seq2:
             S00 += u.residues[i + 4].atoms.select_atoms("name O")
             S01 += u.residues[i + 3].atoms.select_atoms("name O")
             S12 += u.residues[i + 2].atoms.select_atoms("name O")
             S23 += u.residues[i + 1].atoms.select_atoms("name O")
             S34 += u.residues[i + 0].atoms.select_atoms("name O")
-            S45 += u.residues[i + 0].atoms.select_atoms("name OG1")
+            S45 += u.residues[i + 0].atoms.select_atoms("name OG*")
     for name, s in zip(("S00", "S01", "S12", "S23", "S34", "S45"),
                        (S00, S01, S12, S23, S34, S45)):
         if len(s) != 4:
