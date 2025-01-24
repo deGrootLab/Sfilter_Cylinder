@@ -321,7 +321,8 @@ if __name__ == "__main__":
                         dest="traj",
                         metavar="fix_c.xtc",
                         help="This traj should have SF centered.",
-                        type=argparse.FileType('r'),
+                        # type=argparse.FileType('r'),
+                        nargs="+",
                         required=True)
     parser.add_argument("-K",
                         dest="K_name",
@@ -406,7 +407,7 @@ if __name__ == "__main__":
     print("The command you used is :")
     print(" ".join(sys.argv))
     print("PDB top file :", args.top.name)
-    print("xtc traj file:", args.traj.name)
+    print("xtc traj file:", args.traj)
     print("Ion name(s) in this pdb should be:", args.K_name)
     print(f"The Voltage in this simulation is: {args.volt} mV")
     print("The sequence of the SF is:", args.SF_seq, args.SF_seq2)
@@ -431,7 +432,7 @@ if __name__ == "__main__":
             sys.exit("Only xtc is allowed for water-reduced trajectory. Exit")
     print("#################################################################################")
 
-    u = mda.Universe(args.top.name, args.traj.name)
+    u = mda.Universe(args.top.name, args.traj)
     print(f"time step in this xtc is : {u.trajectory.dt} ps")
     sf = sfilter(u)
     sf.detect_SF_sequence(args.SF_seq, args.SF_seq2)
