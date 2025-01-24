@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -549,7 +550,7 @@ def read_k_cylinder(file, method="K_priority", get_occu=True, get_jump=False):
         else:
             raise ValueError("method should be K_priority, Co-occupy, or K_priority_S14")
 
-def read_k_cylinder_list(file_list, method="K_priority", get_occu=True):
+def read_k_cylinder_list(file_list, method="K_priority", get_occu=True, keeplast=False):
     """
     read a list of output file from k_cylinder
     This is designed for reading a sequence of MD simulation that can be concatenated together.
@@ -558,8 +559,10 @@ def read_k_cylinder_list(file_list, method="K_priority", get_occu=True):
     Args:
         file_list: one file or a list of files.
         method: "K_priority" or "Co-occupy"
-        In "K_priority", if there is a K in the binding site, letter K will be assigned.
-        In "Co-occupy", if there is a K and one or more water in the binding site, letter C will be assigned.
+            In "K_priority", if there is a K in the binding site, letter K will be assigned.
+            In "Co-occupy", if there is a K and one or more water in the binding site, letter C will be assigned.
+        get_occu: if True, compute K_occupency and W_occupency for K and W occupancy. otherwise, return empty list, default True
+        keeplast: if True, remove the first frame since the 2nd file. default False
     return:
         state_list, states string is a list
         meta_data, a dict
@@ -582,11 +585,20 @@ def read_k_cylinder_list(file_list, method="K_priority", get_occu=True):
                 s_list_tmp, meta_data_tmp, K_occu_tmp, W_occu_tmp = read_k_cylinder(f, method, get_occu)
                 state_list.extend(s_list_tmp[1:])
                 if meta_data_tmp != meta_data:
-                    raise ValueError("meta_data is different in different files. Please check " + str(f))
-                # K_occupency.extend(K_occu_tmp[1:])
-                # W_occupency.extend(W_occu_tmp[1:])
-                K_occupency = np.concatenate((K_occupency, K_occu_tmp[1:]))
-                W_occupency = np.concatenate((W_occupency, W_occu_tmp[1:]))
+                    # raise ValueError("meta_data is different in different files. Please check " + str(f))
+                    # find the difference
+                    msg = ""
+                    for key in meta_data:
+                        if meta_data[key] != meta_data_tmp[key]:
+                            msg += f"{key}: {meta_data[key]} -> {meta_data_tmp[key]}\n"
+                    warnings.warn(f"The metadata in this file is different from that in the first file.: {f},\n{msg}")
+
+                if keeplast:
+                    K_occupency = np.concatenate((K_occupency, K_occu_tmp))
+                    W_occupency = np.concatenate((W_occupency, W_occu_tmp))
+                else:
+                    K_occupency = np.concatenate((K_occupency, K_occu_tmp[1:]))
+                    W_occupency = np.concatenate((W_occupency, W_occu_tmp[1:]))
     else:
         raise TypeError("file_list must be a str or a list of str")
 
