@@ -22,3 +22,5 @@
 /test/01-NaK2K/1-Charmm/dry/count_nojump/K_SF_perm_event_nj.csv
 /test/07-MthK/Charmm_0.75/+150mV/0?/k_cylinder.jump_np_array.npy
 /test/04-output_wrapper/C_0.75_2ps/05-2ps/0?/analysis/04-state-code/k_cylinder.jump_np_array.npy
+/test/01-NaK2K/1-Charmm/dry/k_cylinder.out
+/test/01-NaK2K/1-Charmm/dry/POT_perm_event.out
